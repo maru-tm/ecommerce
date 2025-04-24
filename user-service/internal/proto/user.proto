@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "internal/proto;proto";
+
+import "google/protobuf/timestamp.proto";
+
+message User {
+  string id = 1;
+  string username = 2;
+  string password_hash = 3;
+  string email = 4;
+  string full_name = 5;
+  UserStatus status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message UserId {
+  string id = 1;
+}
+
+message UserList {
+  repeated User users = 1;
+}
+
+message Empty {}
+
+service UserService {
+  rpc CreateUser(User) returns (User);
+  rpc GetUserByID(UserId) returns (User);
+  rpc ListUsers(Empty) returns (UserList);
+  rpc UpdateUser(User) returns (User);
+  rpc DeleteUser(UserId) returns (Empty);
+}
+
+enum UserStatus {
+  ACTIVE = 0;
+  INACTIVE = 1;
+  BANNED = 2;
+}

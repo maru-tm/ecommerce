@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package inventory;
+
+option go_package = "internal/proto;proto";
+
+message Category {
+  string id = 1;
+  string name = 2;
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  Category category = 3;
+  double price = 4;
+  int32 stock = 5;
+  string description = 6;
+}
+
+message ProductId {
+  string id = 1;
+}
+
+message ProductList {
+  repeated Product products = 1;
+}
+
+message Empty {}
+
+service ProductService {
+  rpc CreateProduct(Product) returns (Product);
+  rpc GetProductByID(ProductId) returns (Product);
+  rpc ListProducts(Empty) returns (ProductList);
+  rpc UpdateProduct(Product) returns (Product);
+  rpc DeleteProduct(ProductId) returns (Empty);
+}
