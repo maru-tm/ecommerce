@@ -1,0 +1,54 @@
+services:
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    # env_file:
+    #   - ./api-gateway/.env
+    depends_on:
+      - user-service
+      - inventory-service
+      - order-service
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "50051:50051"
+    env_file:
+      - ./user-service/.env
+    depends_on:
+      - mongo
+
+  inventory-service:
+    build: ./inventory-service
+    ports:
+      - "50053:50053"
+    env_file:
+      - ./inventory-service/.env
+    depends_on:
+      - mongo
+
+  order-service:
+    build: ./order-service
+    ports:
+      - "50054:50054"
+    env_file:
+      - ./order-service/.env
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.runCommand('ping')"]
+      interval: 30s
+      retries: 5
+
+
+volumes:
+  mongo-data:

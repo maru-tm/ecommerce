@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -15,13 +17,29 @@ type Config struct {
 	Database string
 }
 
+// LoadConfig загружает конфигурацию из .env файла
 func LoadConfig() *Config {
+	// Загружаем переменные окружения из .env файла
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Не удалось загрузить .env файл, используются переменные окружения")
+	}
+
 	return &Config{
-		MongoURI: "mongodb://localhost:27017",
-		Database: "ecommerce_orders",
+		MongoURI: getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		Database: getEnv("MONGO_DB", "ecommerce_orders"),
 	}
 }
 
+// getEnv пытается получить значение переменной окружения или возвращает fallback значение
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}
+
+// ConnectDB подключается к базе данных MongoDB
 func ConnectDB(cfg *Config) *mongo.Database {
 	client, err := mongo.NewClient(options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {

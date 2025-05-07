@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -15,14 +17,30 @@ type DatabaseConfig struct {
 	Database string
 }
 
+// LoadConfig загружает переменные окружения из .env файла и возвращает конфигурацию для базы данных.
 func LoadConfig() *DatabaseConfig {
+	// Загружаем .env файл
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Не удалось загрузить .env файл, используются переменные окружения")
+	}
+
+	// Возвращаем конфигурацию с переменными окружения или значениями по умолчанию
 	return &DatabaseConfig{
-		MongoURI: "mongodb://localhost:27017",
-		// MongoURI: "mongodb+srv://aruzhanduyssenova:pj87dxbb0dtgtohk@cluster0.1rdt5vd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
-		Database: "ecommerce_users",
+		MongoURI: getEnv("MONGO_URI", "mongodb://localhost:27017"), // Если переменная окружения не найдена, используется значение по умолчанию
+		Database: getEnv("MONGO_DB", "ecommerce_users"),
 	}
 }
 
+// getEnv получает значение переменной окружения или возвращает значение по умолчанию
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}
+
+// ConnectDB устанавливает подключение к MongoDB с использованием конфигурации.
 func ConnectDB(cfg *DatabaseConfig) *mongo.Database {
 	client, err := mongo.NewClient(options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
