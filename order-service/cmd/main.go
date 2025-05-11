@@ -7,8 +7,9 @@ import (
 
 	"order-service/config"
 	"order-service/internal/delivery"
+	"order-service/internal/infrastructure/messaging"
+	"order-service/internal/infrastructure/repository"
 	"order-service/internal/proto"
-	"order-service/internal/repository"
 	"order-service/internal/usecase"
 
 	"google.golang.org/grpc"
@@ -26,10 +27,16 @@ func main() {
 	}
 
 	orderRepo := repository.NewOrderRepository(db)
-	orderUC := usecase.NewOrderUseCase(orderRepo)
+	publisher, err := messaging.NewOrderPublisher(cfg)
+	if err != nil {
+		log.Fatalf("Ошибка создания OrderPublisher: %v", err)
+	}
+
+	orderUC := usecase.NewOrderUseCase(orderRepo, publisher)
+
 	orderHandler := delivery.NewOrderServiceServer(orderUC)
 
-	port := ":50052"
+	port := ":" + cfg.OrderServicePort
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen on port %s: %v", port, err)

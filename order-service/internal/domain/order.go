@@ -26,3 +26,19 @@ type Order struct {
 	CreatedAt  time.Time   `bson:"created_at" json:"created_at"`
 	UpdatedAt  time.Time   `bson:"updated_at" json:"updated_at"`
 }
+
+type OrderUseCase interface {
+	CreateOrder(order *Order) error
+	GetOrderByID(id string) (*Order, error)
+	ListOrders() ([]Order, error)
+	UpdateOrder(order *Order) error
+	DeleteOrder(id string) error
+}
+
+type OrderRepository interface {
+	CreateOrder(order *Order) error
+	GetOrderByID(id string) (*Order, error)
+	ListOrders() ([]Order, error)
+	UpdateOrder(order *Order) error
+	DeleteOrder(id string) error
+}

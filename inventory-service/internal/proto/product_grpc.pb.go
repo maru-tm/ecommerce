@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.30.2
-// source: internal/proto/product.proto
+// source: product.proto
 
 package proto
 
@@ -24,6 +24,9 @@ const (
 	ProductService_ListProducts_FullMethodName   = "/inventory.ProductService/ListProducts"
 	ProductService_UpdateProduct_FullMethodName  = "/inventory.ProductService/UpdateProduct"
 	ProductService_DeleteProduct_FullMethodName  = "/inventory.ProductService/DeleteProduct"
+	ProductService_CheckStock_FullMethodName     = "/inventory.ProductService/CheckStock"
+	ProductService_SearchProducts_FullMethodName = "/inventory.ProductService/SearchProducts"
+	ProductService_UpdateStock_FullMethodName    = "/inventory.ProductService/UpdateStock"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -35,6 +38,12 @@ type ProductServiceClient interface {
 	ListProducts(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProductList, error)
 	UpdateProduct(ctx context.Context, in *Product, opts ...grpc.CallOption) (*Product, error)
 	DeleteProduct(ctx context.Context, in *ProductId, opts ...grpc.CallOption) (*Empty, error)
+	// Новый метод для проверки наличия товара на складе
+	CheckStock(ctx context.Context, in *StockRequest, opts ...grpc.CallOption) (*StockResponse, error)
+	// Поиск продуктов по имени или категории
+	SearchProducts(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*ProductSearchList, error)
+	// Обновление количества товара на складе
+	UpdateStock(ctx context.Context, in *StockUpdateRequest, opts ...grpc.CallOption) (*StockResponse, error)
 }
 
 type productServiceClient struct {
@@ -95,6 +104,36 @@ func (c *productServiceClient) DeleteProduct(ctx context.Context, in *ProductId,
 	return out, nil
 }
 
+func (c *productServiceClient) CheckStock(ctx context.Context, in *StockRequest, opts ...grpc.CallOption) (*StockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StockResponse)
+	err := c.cc.Invoke(ctx, ProductService_CheckStock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) SearchProducts(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*ProductSearchList, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProductSearchList)
+	err := c.cc.Invoke(ctx, ProductService_SearchProducts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) UpdateStock(ctx context.Context, in *StockUpdateRequest, opts ...grpc.CallOption) (*StockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StockResponse)
+	err := c.cc.Invoke(ctx, ProductService_UpdateStock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
@@ -104,6 +143,12 @@ type ProductServiceServer interface {
 	ListProducts(context.Context, *Empty) (*ProductList, error)
 	UpdateProduct(context.Context, *Product) (*Product, error)
 	DeleteProduct(context.Context, *ProductId) (*Empty, error)
+	// Новый метод для проверки наличия товара на складе
+	CheckStock(context.Context, *StockRequest) (*StockResponse, error)
+	// Поиск продуктов по имени или категории
+	SearchProducts(context.Context, *SearchRequest) (*ProductSearchList, error)
+	// Обновление количества товара на складе
+	UpdateStock(context.Context, *StockUpdateRequest) (*StockResponse, error)
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -128,6 +173,15 @@ func (UnimplementedProductServiceServer) UpdateProduct(context.Context, *Product
 }
 func (UnimplementedProductServiceServer) DeleteProduct(context.Context, *ProductId) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteProduct not implemented")
+}
+func (UnimplementedProductServiceServer) CheckStock(context.Context, *StockRequest) (*StockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckStock not implemented")
+}
+func (UnimplementedProductServiceServer) SearchProducts(context.Context, *SearchRequest) (*ProductSearchList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchProducts not implemented")
+}
+func (UnimplementedProductServiceServer) UpdateStock(context.Context, *StockUpdateRequest) (*StockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateStock not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 func (UnimplementedProductServiceServer) testEmbeddedByValue()                        {}
@@ -240,6 +294,60 @@ func _ProductService_DeleteProduct_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_CheckStock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).CheckStock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_CheckStock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).CheckStock(ctx, req.(*StockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_SearchProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).SearchProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_SearchProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).SearchProducts(ctx, req.(*SearchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_UpdateStock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StockUpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).UpdateStock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_UpdateStock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).UpdateStock(ctx, req.(*StockUpdateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -267,7 +375,19 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "DeleteProduct",
 			Handler:    _ProductService_DeleteProduct_Handler,
 		},
+		{
+			MethodName: "CheckStock",
+			Handler:    _ProductService_CheckStock_Handler,
+		},
+		{
+			MethodName: "SearchProducts",
+			Handler:    _ProductService_SearchProducts_Handler,
+		},
+		{
+			MethodName: "UpdateStock",
+			Handler:    _ProductService_UpdateStock_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/proto/product.proto",
+	Metadata: "product.proto",
 }

@@ -4,28 +4,25 @@ import (
 	"fmt"
 
 	"order-service/internal/domain"
-	"order-service/internal/repository"
+	"order-service/internal/infrastructure/messaging"
 
 	"github.com/google/uuid"
 )
 
-type OrderUseCase interface {
-	CreateOrder(order *domain.Order) error
-	GetOrderByID(id string) (*domain.Order, error)
-	ListOrders() ([]domain.Order, error)
-	UpdateOrder(order *domain.Order) error
-	DeleteOrder(id string) error
-}
-
 type orderUseCase struct {
-	orderRepo repository.OrderRepository
+	orderRepo      domain.OrderRepository
+	orderPublisher *messaging.OrderPublisher
 }
 
-func NewOrderUseCase(orderRepo repository.OrderRepository) OrderUseCase {
-	return &orderUseCase{orderRepo: orderRepo}
+func NewOrderUseCase(orderRepo domain.OrderRepository, orderPublisher *messaging.OrderPublisher) domain.OrderUseCase {
+	return &orderUseCase{
+		orderRepo:      orderRepo,
+		orderPublisher: orderPublisher,
+	}
 }
 
 func (uc *orderUseCase) validateOrder(order *domain.Order) error {
+	// Проверяем обязательные поля в заказе
 	if order.UserID == "" {
 		return fmt.Errorf("user id cannot be empty")
 	}
@@ -41,47 +38,31 @@ func (uc *orderUseCase) validateOrder(order *domain.Order) error {
 		}
 	}
 
-	products, err := getAllProducts("http://localhost:8080/products")
-	if err != nil {
-		return fmt.Errorf("failed to fetch products: %v", err)
-	}
-
-	for _, orderItem := range order.Items {
-		var foundProduct *Product
-		for _, product := range products {
-			if product.ID == orderItem.ProductID {
-				foundProduct = &product
-				break
-			}
-		}
-
-		if foundProduct == nil {
-			return fmt.Errorf("product with ID %s not found in inventory", orderItem.ProductID)
-		}
-
-		if foundProduct.Stock < orderItem.Quantity {
-			return fmt.Errorf("not enough stock for product %s", foundProduct.Name)
-		}
-
-		newStock := foundProduct.Stock - orderItem.Quantity
-		if err := patchProductStock(orderItem.ProductID, newStock); err != nil {
-			return fmt.Errorf("failed to update stock for product %s: %v", foundProduct.Name, err)
-		}
-	}
-
 	return nil
 }
 
 func (uc *orderUseCase) CreateOrder(order *domain.Order) error {
-	// if err := uc.validateOrder(order); err != nil {
-	// 	return err
-	// }
+	// Валидация заказа
+	if err := uc.validateOrder(order); err != nil {
+		return err
+	}
 
+	// Генерируем ID для заказа, если его нет
 	if order.ID == "" {
 		order.ID = uuid.New().String()
 	}
 
-	return uc.orderRepo.CreateOrder(order)
+	// Сохраняем заказ в репозитории
+	if err := uc.orderRepo.CreateOrder(order); err != nil {
+		return fmt.Errorf("failed to create order: %v", err)
+	}
+
+	// Публикуем сообщение о создании заказа в RabbitMQ
+	if err := uc.orderPublisher.Publish(order); err != nil {
+		return fmt.Errorf("failed to publish order creation event: %v", err)
+	}
+
+	return nil
 }
 
 func (uc *orderUseCase) GetOrderByID(id string) (*domain.Order, error) {

@@ -1,0 +1,54 @@
+ecommerce/
+├── api-gateway/
+│   ├── cmd/
+│   ├── config/
+│   ├── internal/
+│   │   ├── clients/
+│   │   ├── handlers/
+│   │   ├── middleware/
+│   │   ├── proto/
+│   │   │   ├── orders/
+│   │   │   ├── products/
+│   │   │   ├── users/
+│   │   ├── routes/
+│   ├── utils/
+│   ├── Dockerfile
+│   ├── go.mod
+│   ├── go.sum
+├── inventory-service/
+│   ├── cmd/
+│   ├── config/
+│   ├── internal/
+│   │   ├── delivery/
+│   │   ├── domain/
+│   │   ├── proto/
+│   │   ├── repository/
+│   │   ├── usecase/
+│   ├── Dockerfile
+│   ├── go.mod
+│   ├── go.sum
+├── order-service/
+│   ├── cmd/
+│   ├── config/
+│   ├── internal/
+│   │   ├── delivery/
+│   │   ├── domain/
+│   │   ├── proto/
+│   │   ├── repository/
+│   │   ├── usecase/
+│   ├── Dockerfile
+│   ├── go.mod
+│   ├── go.sum
+├── user-service/
+│   ├── cmd/
+│   ├── config/
+│   ├── internal/
+│   │   ├── delivery/
+│   │   ├── domain/
+│   │   ├── proto/
+│   │   ├── repository/
+│   │   ├── usecase/
+│   ├── Dockerfile
+│   ├── go.mod
+│   ├── go.sum
+├── docker-compose.yml

@@ -5,16 +5,15 @@ import (
 	"log"
 	"net/http"
 	"order-service/internal/domain"
-	"order-service/internal/usecase"
 
 	"github.com/gorilla/mux"
 )
 
 type OrderHandler struct {
-	useCase usecase.OrderUseCase
+	useCase domain.OrderUseCase
 }
 
-func NewOrderHandler(useCase usecase.OrderUseCase) *OrderHandler {
+func NewOrderHandler(useCase domain.OrderUseCase) *OrderHandler {
 	return &OrderHandler{useCase: useCase}
 }
 

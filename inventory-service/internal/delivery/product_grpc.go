@@ -146,3 +146,25 @@ func (s *ProductServiceServer) DeleteProduct(ctx context.Context, req *proto.Pro
 
 	return &proto.Empty{}, nil
 }
+
+func (s *ProductServiceServer) CheckStock(ctx context.Context, req *proto.StockRequest) (*proto.StockResponse, error) {
+	log.Printf("CheckStock called with product ID: %s and quantity: %d", req.GetProductId(), req.GetRequestedQuantity())
+
+	inStock, err := s.useCase.CheckStock(req.GetProductId(), int(req.GetRequestedQuantity()))
+	if err != nil {
+		log.Printf("Error checking stock: %v", err)
+		return nil, err
+	}
+
+	message := "Product is in stock"
+	if !inStock {
+		message = "Insufficient stock"
+	}
+
+	log.Printf("CheckStock result: inStock=%v, message=%s", inStock, message)
+
+	return &proto.StockResponse{
+		Available: inStock,
+		Message:   message,
+	}, nil
+}

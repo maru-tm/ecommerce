@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"fmt"
-	"inventory-service/internal/domain"
+	"inventory-service/internal/domain" // импортируем пакет с протобуфами
 	"inventory-service/internal/repository"
 	"log"
 
@@ -14,7 +14,11 @@ type ProductUseCase interface {
 	GetProductByID(id string) (*domain.Product, error)
 	ListProducts() ([]domain.Product, error)
 	UpdateProduct(id string, product *domain.Product) error
+	DecreaseStock(productID string, quantity int) error
 	DeleteProduct(id string) error
+	CheckStock(productID string, quantity int) (bool, error)
+	SearchProducts(query string, categoryID string) ([]domain.Product, error) // Новый метод поиска продуктов
+	UpdateProductStock(productID string, quantity int) error                  // Новый метод для обновления количества товара
 }
 
 type productUseCase struct {
@@ -126,6 +130,39 @@ func (uc *productUseCase) UpdateProduct(id string, product *domain.Product) erro
 	return err
 }
 
+func (uc *productUseCase) DecreaseStock(productID string, quantity int) error {
+	log.Printf("Decreasing stock for product ID: %s by %d", productID, quantity)
+
+	if quantity <= 0 {
+		return fmt.Errorf("quantity must be greater than zero")
+	}
+
+	product, err := uc.repo.GetProductByID(productID)
+	if err != nil {
+		log.Printf("Error fetching product: %v", err)
+		return fmt.Errorf("failed to fetch product: %w", err)
+	}
+	if product == nil {
+		log.Printf("Product with ID '%s' not found", productID)
+		return fmt.Errorf("product with ID '%s' not found", productID)
+	}
+
+	if product.Stock < quantity {
+		log.Printf("Not enough stock: available %d, requested %d", product.Stock, quantity)
+		return fmt.Errorf("not enough stock for product '%s'", productID)
+	}
+
+	product.Stock -= quantity
+	err = uc.repo.UpdateProduct(product)
+	if err != nil {
+		log.Printf("Failed to update product stock: %v", err)
+		return fmt.Errorf("failed to update product stock: %w", err)
+	}
+
+	log.Printf("Stock decreased successfully. New stock: %d", product.Stock)
+	return nil
+}
+
 func (uc *productUseCase) DeleteProduct(id string) error {
 	log.Printf("Deleting product ID: %s", id)
 	existingProduct, err := uc.repo.GetProductByID(id)
@@ -145,4 +182,56 @@ func (uc *productUseCase) DeleteProduct(id string) error {
 		log.Printf("Product with ID '%s' deleted successfully", id)
 	}
 	return err
+}
+
+func (uc *productUseCase) CheckStock(productID string, quantity int) (bool, error) {
+	log.Printf("Checking stock for product ID: %s with quantity: %d", productID, quantity)
+
+	available, err := uc.repo.CheckStock(productID)
+	if err != nil {
+		log.Printf("Error checking stock: %v", err)
+		return false, fmt.Errorf("failed to check stock: %w", err)
+	}
+
+	return available, nil
+}
+
+func (uc *productUseCase) SearchProducts(query string, categoryID string) ([]domain.Product, error) {
+	log.Printf("Searching products with query: %s and category ID: %s", query, categoryID)
+
+	// Выполним поиск в репозитории
+	products, err := uc.repo.SearchProducts(query, categoryID)
+	if err != nil {
+		log.Printf("Error searching products: %v", err)
+		return nil, fmt.Errorf("failed to search products: %w", err)
+	}
+
+	log.Printf("Found %d products matching the search", len(products))
+	return products, nil
+}
+
+func (uc *productUseCase) UpdateProductStock(productID string, quantity int) error {
+	log.Printf("Updating stock for product ID: %s by %d", productID, quantity)
+
+	// Получаем продукт из репозитория
+	product, err := uc.repo.GetProductByID(productID)
+	if err != nil {
+		log.Printf("Error fetching product: %v", err)
+		return fmt.Errorf("failed to fetch product: %w", err)
+	}
+	if product == nil {
+		log.Printf("Product with ID '%s' not found", productID)
+		return fmt.Errorf("product with ID '%s' not found", productID)
+	}
+
+	// Обновляем количество товара
+	product.Stock = quantity
+	err = uc.repo.UpdateProduct(product)
+	if err != nil {
+		log.Printf("Failed to update product stock: %v", err)
+		return fmt.Errorf("failed to update product stock: %w", err)
+	}
+
+	log.Printf("Product stock updated successfully to %d", quantity)
+	return nil
 }

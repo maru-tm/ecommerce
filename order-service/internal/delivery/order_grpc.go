@@ -6,17 +6,16 @@ import (
 
 	"order-service/internal/domain"
 	"order-service/internal/proto"
-	"order-service/internal/usecase"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type OrderServiceServer struct {
 	proto.UnimplementedOrderServiceServer
-	useCase usecase.OrderUseCase
+	useCase domain.OrderUseCase
 }
 
-func NewOrderServiceServer(useCase usecase.OrderUseCase) *OrderServiceServer {
+func NewOrderServiceServer(useCase domain.OrderUseCase) *OrderServiceServer {
 	log.Println("Initializing OrderServiceServer")
 	return &OrderServiceServer{
 		useCase: useCase,

@@ -7,6 +7,7 @@ import (
 
 	"inventory-service/config"
 	"inventory-service/internal/delivery"
+	"inventory-service/internal/messaging"
 	"inventory-service/internal/proto"
 	"inventory-service/internal/repository"
 	"inventory-service/internal/usecase"
@@ -29,7 +30,7 @@ func main() {
 	productUC := usecase.NewProductUseCase(productRepo)
 	productHandler := delivery.NewProductServiceServer(productUC)
 
-	port := ":50053"
+	port := ":" + cfg.InventoryServerPort
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen on port %s: %v", port, err)
@@ -38,6 +39,8 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	proto.RegisterProductServiceServer(grpcServer, productHandler)
+
+	go messaging.StartConsumer(productUC)
 
 	fmt.Printf("gRPC server started on %s\n", port)
 

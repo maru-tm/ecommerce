@@ -3,27 +3,30 @@ package main
 import (
 	"log"
 
+	"github.com/gin-gonic/gin"
+
+	"api-gateway/config"
 	"api-gateway/internal/clients"
 	"api-gateway/internal/middleware"
 	"api-gateway/internal/routes"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	userClient, err := clients.NewUserClient("localhost:50051")
+	cfg := config.LoadConfig()
+
+	userClient, err := clients.NewUserClient(cfg.UserServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to create user client: %v", err)
 	}
 
-	orderClient, err := clients.NewOrderClient("localhost:50052")
+	orderClient, err := clients.NewOrderClient(cfg.OrderServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to create order client: %v", err)
 	}
 
-	inventoryClient, err := clients.NewProductClient("localhost:50053")
+	inventoryClient, err := clients.NewProductClient(cfg.ProductServiceAddr)
 	if err != nil {
-		log.Fatalf("Failed to create inventory client: %v", err)
+		log.Fatalf("Failed to create product client: %v", err)
 	}
 
 	r := gin.Default()
@@ -35,7 +38,7 @@ func main() {
 	routes.RegisterOrderRoutes(r, orderClient)
 	routes.RegisterProductRoutes(r, inventoryClient)
 
-	if err := r.Run(":8000"); err != nil {
+	if err := r.Run(":" + cfg.APIGatewayPort); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

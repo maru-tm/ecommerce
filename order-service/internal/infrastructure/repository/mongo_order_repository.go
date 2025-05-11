@@ -16,7 +16,7 @@ type orderRepository struct {
 	db *mongo.Database
 }
 
-func NewOrderRepository(db *mongo.Database) OrderRepository {
+func NewOrderRepository(db *mongo.Database) domain.OrderRepository {
 	return &orderRepository{db: db}
 }
 

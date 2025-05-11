@@ -27,7 +27,7 @@ func LoadConfig() *DatabaseConfig {
 
 	// Возвращаем конфигурацию с переменными окружения или значениями по умолчанию
 	return &DatabaseConfig{
-		MongoURI: getEnv("MONGO_URI", "mongodb://localhost:27017"), // Если переменная окружения не найдена, используется значение по умолчанию
+		MongoURI: getEnv("MONGO_URI", "mongodb://mongo:27017"), // Если переменная окружения не найдена, используется значение по умолчанию
 		Database: getEnv("MONGO_DB", "ecommerce_users"),
 	}
 }

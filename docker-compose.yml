@@ -1,14 +1,22 @@
+version: '3.8'
+
 services:
   api-gateway:
     build: ./api-gateway
     ports:
       - "8080:8080"
-    # env_file:
-    #   - ./api-gateway/.env
+    env_file:
+      - ./api-gateway/.env
     depends_on:
       - user-service
       - inventory-service
       - order-service
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
 
   user-service:
     build: ./user-service
@@ -18,6 +26,12 @@ services:
       - ./user-service/.env
     depends_on:
       - mongo
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:50051/health"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
 
   inventory-service:
     build: ./inventory-service
@@ -27,15 +41,31 @@ services:
       - ./inventory-service/.env
     depends_on:
       - mongo
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:50053/health"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
 
   order-service:
     build: ./order-service
     ports:
-      - "50054:50054"
+      - "50052:50052"
     env_file:
       - ./order-service/.env
     depends_on:
-      - mongo
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:50052/health"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
 
   mongo:
     image: mongo:6.0
@@ -47,8 +77,23 @@ services:
     healthcheck:
       test: ["CMD", "mongo", "--eval", "db.runCommand('ping')"]
       interval: 30s
+      timeout: 10s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"     
+      - "15672:15672"  
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 volumes:
   mongo-data:
