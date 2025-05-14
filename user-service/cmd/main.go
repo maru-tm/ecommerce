@@ -25,6 +25,10 @@ func main() {
 		log.Fatalf("failed to connect to the database")
 	}
 
+	if err := config.InitRedis(); err != nil {
+		log.Fatalf("Не удалось подключиться к Redis: %v", err)
+	}
+
 	userRepo := repository.NewUserRepository(db)
 	userUC := usecase.NewUserUseCase(userRepo)
 	userHandler := delivery.NewUserServiceServer(userUC)

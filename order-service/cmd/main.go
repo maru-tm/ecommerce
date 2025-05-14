@@ -26,6 +26,10 @@ func main() {
 		log.Fatalf("failed to connect to the database")
 	}
 
+	if err := config.InitRedis(); err != nil {
+		log.Fatalf("Не удалось подключиться к Redis: %v", err)
+	}
+
 	orderRepo := repository.NewOrderRepository(db)
 	publisher, err := messaging.NewOrderPublisher(cfg)
 	if err != nil {
