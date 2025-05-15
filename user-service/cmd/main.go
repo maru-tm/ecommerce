@@ -34,10 +34,10 @@ func main() {
 	}
 
 	redisClient := config.GetRedisClient()
-	productCache := redis.NewUserCache(redisClient, 5*time.Minute) // создаём отдельный кэш-слой
+	userCache := redis.NewUserCache(redisClient, 5*time.Minute) // создаём отдельный кэш-слой
 
 	userRepo := repository.NewUserRepository(db)
-	userUC := usecase.NewUserUseCase(userRepo, productCache)
+	userUC := usecase.NewUserUseCase(userRepo, userCache)
 	userHandler := delivery.NewUserServiceServer(userUC)
 
 	port := ":50051"

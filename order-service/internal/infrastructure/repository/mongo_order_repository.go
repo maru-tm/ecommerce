@@ -35,13 +35,13 @@ func (r *orderRepository) GetOrderByID(id string) (*domain.Order, error) {
 	collection := r.db.Collection("orders")
 
 	var order domain.Order
-	// Преобразуем строковый ID в ObjectID
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ObjectID format for order ID '%s': %w", id, err)
-	}
+	// // Преобразуем строковый ID в ObjectID
+	// objectID, err := primitive.ObjectIDFromHex(id)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("invalid ObjectID format for order ID '%s': %w", id, err)
+	// }
 
-	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&order)
+	err := collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&order)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil

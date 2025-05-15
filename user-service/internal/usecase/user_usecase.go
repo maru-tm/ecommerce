@@ -17,7 +17,7 @@ type userUseCase struct {
 }
 
 func NewUserUseCase(repo domain.UserRepository, cache domain.UserCache) domain.UserUseCase {
-	return &userUseCase{repo: repo}
+	return &userUseCase{repo: repo, cache: cache}
 }
 
 func (uc *userUseCase) validateUser(user *domain.User) error {

@@ -3,11 +3,14 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"api-gateway/internal/clients"
+	"api-gateway/internal/handlers/dto"
 	"api-gateway/internal/proto/users/proto" // Updated path for the generated proto files
 
 	"github.com/gin-gonic/gin"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type UserHandler struct {
@@ -20,14 +23,33 @@ func NewUserHandler(client *clients.UserClient) *UserHandler {
 
 // CreateUser handles the creation of a new user
 func (h *UserHandler) CreateUser(c *gin.Context) {
-	var userRequest proto.User
-	if err := c.ShouldBindJSON(&userRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+	var input dto.CreateUserInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON", "details": err.Error()})
 		return
 	}
 
-	// Call the UserClient to create the user
-	userResponse, err := h.client.CreateUser(context.Background(), &userRequest)
+	// Преобразуем статус в enum
+	statusVal, ok := proto.UserStatus_value[strings.ToUpper(input.Status)]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user status"})
+		return
+	}
+
+	// Преобразуем в proto.User
+	userProto := &proto.User{
+		Id:           input.ID,
+		Username:     input.Username,
+		PasswordHash: input.Password,
+		Email:        input.Email,
+		FullName:     input.FullName,
+		Status:       proto.UserStatus(statusVal),
+		CreatedAt:    timestamppb.New(input.CreatedAt),
+		UpdatedAt:    timestamppb.New(input.UpdatedAt),
+	}
+
+	// Отправляем в gRPC
+	userResponse, err := h.client.CreateUser(context.Background(), userProto)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "details": err.Error()})
 		return
