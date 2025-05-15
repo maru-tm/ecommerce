@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"user-service/config"
 	"user-service/internal/delivery"
+	"user-service/internal/infrastructure/redis"
+	"user-service/internal/infrastructure/repository"
 	"user-service/internal/proto"
-	"user-service/internal/repository"
 	"user-service/internal/usecase"
 
 	"google.golang.org/grpc"
@@ -25,12 +28,16 @@ func main() {
 		log.Fatalf("failed to connect to the database")
 	}
 
-	if err := config.InitRedis(); err != nil {
+	ctx := context.Background()
+	if err := config.InitRedis(ctx); err != nil {
 		log.Fatalf("Не удалось подключиться к Redis: %v", err)
 	}
 
+	redisClient := config.GetRedisClient()
+	productCache := redis.NewUserCache(redisClient, 5*time.Minute) // создаём отдельный кэш-слой
+
 	userRepo := repository.NewUserRepository(db)
-	userUC := usecase.NewUserUseCase(userRepo)
+	userUC := usecase.NewUserUseCase(userRepo, productCache)
 	userHandler := delivery.NewUserServiceServer(userUC)
 
 	port := ":50051"

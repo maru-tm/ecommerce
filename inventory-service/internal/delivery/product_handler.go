@@ -3,7 +3,6 @@ package delivery
 import (
 	"encoding/json"
 	"inventory-service/internal/domain"
-	"inventory-service/internal/usecase"
 	"log"
 	"net/http"
 
@@ -11,10 +10,10 @@ import (
 )
 
 type ProductHandler struct {
-	useCase usecase.ProductUseCase
+	useCase domain.ProductUseCase
 }
 
-func NewProductHandler(useCase usecase.ProductUseCase) *ProductHandler {
+func NewProductHandler(useCase domain.ProductUseCase) *ProductHandler {
 	return &ProductHandler{useCase: useCase}
 }
 

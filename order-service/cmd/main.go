@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"order-service/config"
 	"order-service/internal/delivery"
 	"order-service/internal/infrastructure/messaging"
+	"order-service/internal/infrastructure/redis"
 	"order-service/internal/infrastructure/repository"
 	"order-service/internal/proto"
 	"order-service/internal/usecase"
@@ -26,9 +29,12 @@ func main() {
 		log.Fatalf("failed to connect to the database")
 	}
 
-	if err := config.InitRedis(); err != nil {
+	ctx := context.Background()
+	if err := config.InitRedis(ctx); err != nil {
 		log.Fatalf("Не удалось подключиться к Redis: %v", err)
 	}
+	redisClient := config.GetRedisClient()
+	orderCache := redis.NewOrderCache(redisClient, 5*time.Minute) // создаём отдельный кэш-слой
 
 	orderRepo := repository.NewOrderRepository(db)
 	publisher, err := messaging.NewOrderPublisher(cfg)
@@ -36,7 +42,7 @@ func main() {
 		log.Fatalf("Ошибка создания OrderPublisher: %v", err)
 	}
 
-	orderUC := usecase.NewOrderUseCase(orderRepo, publisher)
+	orderUC := usecase.NewOrderUseCase(orderRepo, publisher, orderCache)
 
 	orderHandler := delivery.NewOrderServiceServer(orderUC)
 

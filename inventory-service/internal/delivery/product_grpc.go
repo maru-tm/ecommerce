@@ -4,16 +4,15 @@ import (
 	"context"
 	"inventory-service/internal/domain"
 	"inventory-service/internal/proto"
-	"inventory-service/internal/usecase"
 	"log"
 )
 
 type ProductServiceServer struct {
 	proto.UnimplementedProductServiceServer
-	useCase usecase.ProductUseCase
+	useCase domain.ProductUseCase
 }
 
-func NewProductServiceServer(useCase usecase.ProductUseCase) *ProductServiceServer {
+func NewProductServiceServer(useCase domain.ProductUseCase) *ProductServiceServer {
 	log.Println("Initializing ProductServiceServer")
 	return &ProductServiceServer{
 		useCase: useCase,

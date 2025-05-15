@@ -6,16 +6,15 @@ import (
 	"net/http"
 
 	"user-service/internal/domain"
-	"user-service/internal/usecase"
 
 	"github.com/gorilla/mux"
 )
 
 type UserHandler struct {
-	useCase usecase.UserUseCase
+	useCase domain.UserUseCase
 }
 
-func NewUserHandler(useCase usecase.UserUseCase) *UserHandler {
+func NewUserHandler(useCase domain.UserUseCase) *UserHandler {
 	return &UserHandler{useCase: useCase}
 }
 

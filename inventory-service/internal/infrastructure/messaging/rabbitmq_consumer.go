@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"inventory-service/config"
-	"inventory-service/internal/usecase"
+	"inventory-service/internal/domain"
 )
 
 type OrderItem struct {
@@ -24,7 +24,7 @@ type OrderItemEvent struct {
 	UpdatedAt  time.Time   `json:"updated_at"`
 }
 
-func StartConsumer(inventoryUC usecase.ProductUseCase) {
+func StartConsumer(inventoryUC domain.ProductUseCase) {
 	cfg := config.LoadConfig()
 
 	// Используем централизованное подключение

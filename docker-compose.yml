@@ -8,12 +8,9 @@ services:
     env_file:
       - ./api-gateway/.env
     depends_on:
-      user-service:
-        condition: service_healthy
-      inventory-service:
-        condition: service_healthy
-      order-service:
-        condition: service_healthy
+      - mongo
+      - redis
+      - rabbitmq
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -28,10 +25,8 @@ services:
     env_file:
       - ./user-service/.env
     depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mongo
+      - redis
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:50051/health"]
       interval: 30s
@@ -46,12 +41,10 @@ services:
     env_file:
       - ./inventory-service/.env
     depends_on:
-      mongo:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mongo
+      - redis
+      - rabbitmq
+
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:50053/health"]
       interval: 30s
@@ -66,12 +59,10 @@ services:
     env_file:
       - ./order-service/.env
     depends_on:
-      mongo:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy  
-      redis:
-        condition: service_healthy
+      - mongo
+      - redis
+      - rabbitmq
+
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:50052/health"]
       interval: 30s

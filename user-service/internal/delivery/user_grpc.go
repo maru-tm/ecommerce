@@ -5,7 +5,6 @@ import (
 
 	"user-service/internal/domain"
 	"user-service/internal/proto"
-	"user-service/internal/usecase"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,10 +13,10 @@ import (
 
 type UserServer struct {
 	proto.UnimplementedUserServiceServer
-	uc usecase.UserUseCase
+	uc domain.UserUseCase
 }
 
-func NewUserServiceServer(uc usecase.UserUseCase) *UserServer {
+func NewUserServiceServer(uc domain.UserUseCase) *UserServer {
 	return &UserServer{uc: uc}
 }
 

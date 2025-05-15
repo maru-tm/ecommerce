@@ -1,29 +1,22 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
 	"user-service/internal/domain"
-	"user-service/internal/repository"
 
 	"github.com/google/uuid"
 )
 
-type UserUseCase interface {
-	CreateUser(user *domain.User) (*domain.User, error)
-	GetUserByID(id string) (*domain.User, error)
-	ListUsers() ([]domain.User, error)
-	UpdateUser(id string, user *domain.User) (*domain.User, error)
-	DeleteUser(id string) error
-}
-
 type userUseCase struct {
-	repo repository.UserRepository
+	repo  domain.UserRepository
+	cache domain.UserCache
 }
 
-func NewUserUseCase(repo repository.UserRepository) UserUseCase {
+func NewUserUseCase(repo domain.UserRepository, cache domain.UserCache) domain.UserUseCase {
 	return &userUseCase{repo: repo}
 }
 
@@ -79,8 +72,16 @@ func (uc *userUseCase) CreateUser(user *domain.User) (*domain.User, error) {
 }
 
 func (uc *userUseCase) GetUserByID(id string) (*domain.User, error) {
-	log.Printf("Getting user by ID: %s", id)
+	ctx := context.Background()
 
+	// Сначала пробуем кэш
+	if user, _ := uc.cache.GetUser(ctx, id); user != nil {
+		log.Printf("[GET] User found in cache: %s", id)
+		return user, nil
+	}
+
+	// Иначе — база
+	log.Printf("[GET] User not found in cache. Fetching from DB: %s", id)
 	user, err := uc.repo.GetUserByID(id)
 	if err != nil {
 		log.Printf("Error fetching user: %v", err)
@@ -90,15 +91,31 @@ func (uc *userUseCase) GetUserByID(id string) (*domain.User, error) {
 		log.Printf("User with ID '%s' not found", id)
 		return nil, fmt.Errorf("user not found")
 	}
+	if err := uc.cache.SetUser(ctx, user); err != nil {
+		log.Printf("[CACHE] Failed to set user in cache: %v", err)
+	}
 	return user, nil
 }
 
 func (uc *userUseCase) ListUsers() ([]domain.User, error) {
 	log.Println("Listing users...")
+
+	ctx := context.Background()
+	cacheKey := "users:all"
+
+	if users, _ := uc.cache.GetUsers(ctx, cacheKey); users != nil {
+		log.Println("[GET] Users found in cache")
+		return users, nil
+	}
+
+	log.Println("[GET] Users not found in cache. Fetching from DB")
 	users, err := uc.repo.ListUsers()
 	if err != nil {
 		log.Printf("Error listing users: %v", err)
 		return nil, err
+	}
+	if err := uc.cache.SetUsers(ctx, cacheKey, users); err != nil {
+		log.Printf("[CACHE] Failed to set users in cache: %v", err)
 	}
 	return users, nil
 }

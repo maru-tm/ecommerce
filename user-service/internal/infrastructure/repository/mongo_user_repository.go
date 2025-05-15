@@ -14,7 +14,7 @@ type userRepository struct {
 	db *mongo.Database
 }
 
-func NewUserRepository(db *mongo.Database) UserRepository {
+func NewUserRepository(db *mongo.Database) domain.UserRepository {
 	return &userRepository{db: db}
 }
 
