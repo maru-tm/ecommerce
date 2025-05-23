@@ -16,154 +16,80 @@ type OrderServiceServer struct {
 }
 
 func NewOrderServiceServer(useCase domain.OrderUseCase) *OrderServiceServer {
-	log.Println("Initializing OrderServiceServer")
-	return &OrderServiceServer{
-		useCase: useCase,
-	}
+	log.Println("[INFO] Initializing OrderServiceServer")
+	return &OrderServiceServer{useCase: useCase}
 }
 
 func (s *OrderServiceServer) CreateOrder(ctx context.Context, req *proto.Order) (*proto.Order, error) {
-	log.Printf("CreateOrder called with request: %v", req)
+	log.Printf("[INFO] CreateOrder: received request: ID=%s, UserID=%s", req.GetId(), req.GetUserId())
 
-	order := &domain.Order{
-		ID:         req.GetId(),
-		UserID:     req.GetUserId(),
-		TotalPrice: req.GetTotalPrice(),
-		Status:     domain.OrderStatus(req.GetStatus().String()),
-		CreatedAt:  req.GetCreatedAt().AsTime(),
-		UpdatedAt:  req.GetUpdatedAt().AsTime(),
-	}
-
-	var orderItems []domain.OrderItem
-	for _, item := range req.GetItems() {
-		orderItems = append(orderItems, domain.OrderItem{
-			ProductID: item.GetProductId(),
-			Quantity:  int(item.GetQuantity()),
-		})
-	}
-	order.Items = orderItems
-
+	order := mapProtoToDomain(req)
 	err := s.useCase.CreateOrder(order)
 	if err != nil {
-		log.Printf("Error creating order: %v", err)
+		log.Printf("[ERROR] CreateOrder: failed to create order ID=%s: %v", order.ID, err)
 		return nil, err
 	}
 
-	log.Printf("Order successfully created: %v", order)
-
-	return &proto.Order{
-		Id:         order.ID,
-		UserId:     order.UserID,
-		TotalPrice: order.TotalPrice,
-		Status:     proto.OrderStatus(proto.OrderStatus_value[string(order.Status)]),
-		CreatedAt:  timestamppb.New(order.CreatedAt),
-		UpdatedAt:  timestamppb.New(order.UpdatedAt),
-		Items:      mapOrderItemsToProto(order.Items),
-	}, nil
+	log.Printf("[INFO] CreateOrder: successfully created order ID=%s", order.ID)
+	return mapDomainToProto(order), nil
 }
 
 func (s *OrderServiceServer) GetOrderByID(ctx context.Context, req *proto.OrderId) (*proto.Order, error) {
-	log.Printf("GetOrderByID called with order ID: %v", req.GetId())
+	log.Printf("[INFO] GetOrderByID: looking for order ID=%s", req.GetId())
 
 	order, err := s.useCase.GetOrderByID(req.GetId())
 	if err != nil {
-		log.Printf("Error getting order by ID: %v", err)
+		log.Printf("[ERROR] GetOrderByID: failed to find order ID=%s: %v", req.GetId(), err)
 		return nil, err
 	}
 
-	log.Printf("Order found: %v", order)
-
-	return &proto.Order{
-		Id:         order.ID,
-		UserId:     order.UserID,
-		TotalPrice: order.TotalPrice,
-		Status:     proto.OrderStatus(proto.OrderStatus_value[string(order.Status)]),
-		CreatedAt:  timestamppb.New(order.CreatedAt),
-		UpdatedAt:  timestamppb.New(order.UpdatedAt),
-		Items:      mapOrderItemsToProto(order.Items),
-	}, nil
+	log.Printf("[INFO] GetOrderByID: found order ID=%s", order.ID)
+	return mapDomainToProto(order), nil
 }
 
 func (s *OrderServiceServer) ListOrders(ctx context.Context, req *proto.Empty) (*proto.OrderList, error) {
-	log.Println("ListOrders called")
+	log.Println("[INFO] ListOrders: fetching all orders")
 
 	orders, err := s.useCase.ListOrders()
 	if err != nil {
-		log.Printf("Error listing orders: %v", err)
+		log.Printf("[ERROR] ListOrders: failed to fetch orders: %v", err)
 		return nil, err
 	}
 
-	log.Printf("Found %d orders", len(orders))
+	log.Printf("[INFO] ListOrders: retrieved %d orders", len(orders))
 
-	var orderList []*proto.Order
-	for _, o := range orders {
-		orderList = append(orderList, &proto.Order{
-			Id:         o.ID,
-			UserId:     o.UserID,
-			TotalPrice: o.TotalPrice,
-			Status:     proto.OrderStatus(proto.OrderStatus_value[string(o.Status)]),
-			CreatedAt:  timestamppb.New(o.CreatedAt),
-			UpdatedAt:  timestamppb.New(o.UpdatedAt),
-			Items:      mapOrderItemsToProto(o.Items),
-		})
+	var protoOrders []*proto.Order
+	for _, order := range orders {
+		protoOrders = append(protoOrders, mapDomainToProto(&order))
 	}
 
-	log.Printf("Returning order list with %d orders", len(orderList))
-
-	return &proto.OrderList{Orders: orderList}, nil
+	return &proto.OrderList{Orders: protoOrders}, nil
 }
 
 func (s *OrderServiceServer) UpdateOrder(ctx context.Context, req *proto.Order) (*proto.Order, error) {
-	log.Printf("UpdateOrder called with request: %v", req)
+	log.Printf("[INFO] UpdateOrder: updating order ID=%s", req.GetId())
 
-	order := &domain.Order{
-		ID:         req.GetId(),
-		UserID:     req.GetUserId(),
-		TotalPrice: req.GetTotalPrice(),
-		Status:     domain.OrderStatus(req.GetStatus().String()),
-		CreatedAt:  req.GetCreatedAt().AsTime(),
-		UpdatedAt:  req.GetUpdatedAt().AsTime(),
-	}
-
-	var orderItems []domain.OrderItem
-	for _, item := range req.GetItems() {
-		orderItems = append(orderItems, domain.OrderItem{
-			ProductID: item.GetProductId(),
-			Quantity:  int(item.GetQuantity()),
-		})
-	}
-	order.Items = orderItems
-
+	order := mapProtoToDomain(req)
 	err := s.useCase.UpdateOrder(order)
 	if err != nil {
-		log.Printf("Error updating order: %v", err)
+		log.Printf("[ERROR] UpdateOrder: failed to update order ID=%s: %v", order.ID, err)
 		return nil, err
 	}
 
-	log.Printf("Order successfully updated: %v", order)
-
-	return &proto.Order{
-		Id:         order.ID,
-		UserId:     order.UserID,
-		TotalPrice: order.TotalPrice,
-		Status:     proto.OrderStatus(proto.OrderStatus_value[string(order.Status)]),
-		CreatedAt:  timestamppb.New(order.CreatedAt),
-		UpdatedAt:  timestamppb.New(order.UpdatedAt),
-		Items:      mapOrderItemsToProto(order.Items),
-	}, nil
+	log.Printf("[INFO] UpdateOrder: successfully updated order ID=%s", order.ID)
+	return mapDomainToProto(order), nil
 }
 
 func (s *OrderServiceServer) DeleteOrder(ctx context.Context, req *proto.OrderId) (*proto.Empty, error) {
-	log.Printf("DeleteOrder called with order ID: %v", req.GetId())
+	log.Printf("[INFO] DeleteOrder: deleting order ID=%s", req.GetId())
 
 	err := s.useCase.DeleteOrder(req.GetId())
 	if err != nil {
-		log.Printf("Error deleting order: %v", err)
+		log.Printf("[ERROR] DeleteOrder: failed to delete order ID=%s: %v", req.GetId(), err)
 		return nil, err
 	}
 
-	log.Printf("Order successfully deleted with ID: %v", req.GetId())
-
+	log.Printf("[INFO] DeleteOrder: successfully deleted order ID=%s", req.GetId())
 	return &proto.Empty{}, nil
 }
 
@@ -176,4 +102,39 @@ func mapOrderItemsToProto(orderItems []domain.OrderItem) []*proto.OrderItem {
 		})
 	}
 	return protoItems
+}
+
+func mapProtoToDomain(req *proto.Order) *domain.Order {
+	createdAt := req.GetCreatedAt().AsTime()
+	updatedAt := req.GetUpdatedAt().AsTime()
+
+	var items []domain.OrderItem
+	for _, item := range req.GetItems() {
+		items = append(items, domain.OrderItem{
+			ProductID: item.GetProductId(),
+			Quantity:  int(item.GetQuantity()),
+		})
+	}
+
+	return &domain.Order{
+		ID:         req.GetId(),
+		UserID:     req.GetUserId(),
+		TotalPrice: req.GetTotalPrice(),
+		Status:     domain.OrderStatus(req.GetStatus().String()),
+		CreatedAt:  &createdAt,
+		UpdatedAt:  &updatedAt,
+		Items:      items,
+	}
+}
+
+func mapDomainToProto(order *domain.Order) *proto.Order {
+	return &proto.Order{
+		Id:         order.ID,
+		UserId:     order.UserID,
+		TotalPrice: order.TotalPrice,
+		Status:     proto.OrderStatus(proto.OrderStatus_value[string(order.Status)]),
+		CreatedAt:  timestamppb.New(*order.CreatedAt),
+		UpdatedAt:  timestamppb.New(*order.UpdatedAt),
+		Items:      mapOrderItemsToProto(order.Items),
+	}
 }

@@ -3,9 +3,8 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"strings"
 
-	"api-gateway/internal/clients"
+	"api-gateway/internal/email"
 	"api-gateway/internal/handlers/dto"
 	"api-gateway/internal/proto/users/proto" // Updated path for the generated proto files
 
@@ -14,11 +13,15 @@ import (
 )
 
 type UserHandler struct {
-	client *clients.UserClient
+	client proto.UserServiceClient
+	mailer *email.Mailer
 }
 
-func NewUserHandler(client *clients.UserClient) *UserHandler {
-	return &UserHandler{client: client}
+func NewUserHandler(client proto.UserServiceClient, mailer *email.Mailer) *UserHandler {
+	return &UserHandler{
+		client: client,
+		mailer: mailer,
+	}
 }
 
 // CreateUser handles the creation of a new user
@@ -29,12 +32,12 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	// Преобразуем статус в enum
-	statusVal, ok := proto.UserStatus_value[strings.ToUpper(input.Status)]
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user status"})
-		return
-	}
+	// // Преобразуем статус в enum
+	// statusVal, ok := proto.UserStatus_value[strings.ToUpper(input.Status)]
+	// if !ok {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user status"})
+	// 	return
+	// }
 
 	// Преобразуем в proto.User
 	userProto := &proto.User{
@@ -43,7 +46,6 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		PasswordHash: input.Password,
 		Email:        input.Email,
 		FullName:     input.FullName,
-		Status:       proto.UserStatus(statusVal),
 		CreatedAt:    timestamppb.New(input.CreatedAt),
 		UpdatedAt:    timestamppb.New(input.UpdatedAt),
 	}
@@ -54,6 +56,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "details": err.Error()})
 		return
 	}
+
+	go func(email, name string) {
+		if err := h.mailer.SendWelcomeEmail(email, name); err != nil {
+			// Логируем ошибку, но не мешаем API
+			// log.Printf("Failed to send welcome email to %s: %v", email, err)
+		}
+	}(input.Email, input.FullName)
 
 	c.JSON(http.StatusOK, userResponse)
 }
@@ -75,7 +84,7 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 // ListUsers handles the retrieval of all users
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Call the UserClient to list all users
-	userList, err := h.client.ListUsers(context.Background())
+	userList, err := h.client.ListUsers(context.Background(), &proto.Empty{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user list", "details": err.Error()})
 		return
@@ -107,7 +116,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
 
 	// Call the UserClient to delete the user
-	err := h.client.DeleteUser(context.Background(), &proto.UserId{Id: userID})
+	_, err := h.client.DeleteUser(context.Background(), &proto.UserId{Id: userID})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user", "details": err.Error()})
 		return

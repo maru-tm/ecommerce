@@ -7,12 +7,14 @@ import (
 
 	"api-gateway/config"
 	"api-gateway/internal/clients"
+	"api-gateway/internal/email"
 	"api-gateway/internal/middleware"
 	"api-gateway/internal/routes"
 )
 
 func main() {
 	cfg := config.LoadConfig()
+	mailer := email.NewMailer(cfg)
 
 	userClient, err := clients.NewUserClient(cfg.UserServiceAddr)
 	if err != nil {
@@ -34,7 +36,7 @@ func main() {
 	r.Use(middleware.LoggerMiddleware())
 	r.Use(middleware.AuthMiddleware())
 
-	routes.RegisterUserRoutes(r, userClient)
+	routes.RegisterUserRoutes(r, userClient, mailer)
 	routes.RegisterOrderRoutes(r, orderClient)
 	routes.RegisterProductRoutes(r, inventoryClient)
 

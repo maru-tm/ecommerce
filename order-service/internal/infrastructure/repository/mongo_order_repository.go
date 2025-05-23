@@ -3,119 +3,160 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"order-service/internal/domain"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type orderRepository struct {
-	db *mongo.Database
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
 func NewOrderRepository(db *mongo.Database) domain.OrderRepository {
-	return &orderRepository{db: db}
+	return &orderRepository{
+		db:         db,
+		collection: db.Collection("orders"),
+	}
 }
 
 func (r *orderRepository) CreateOrder(order *domain.Order) error {
-	collection := r.db.Collection("orders")
+	ctx := context.Background()
+	log.Printf("[CreateOrder] Start creating order ID=%s", order.ID)
 
-	_, err := collection.InsertOne(context.Background(), order)
+	_, err := r.collection.InsertOne(ctx, order)
 	if err != nil {
-		return fmt.Errorf("failed to create order with ID '%s': %w", order.ID, err)
+		err = fmt.Errorf("failed to create order with ID '%s': %w", order.ID, err)
+		log.Printf("[CreateOrder] Error: %v", err)
+		return err
 	}
 
+	log.Printf("[CreateOrder] Successfully created order ID=%s", order.ID)
 	return nil
 }
 
 func (r *orderRepository) GetOrderByID(id string) (*domain.Order, error) {
-	collection := r.db.Collection("orders")
+	ctx := context.Background()
+	log.Printf("[GetOrderByID] Fetching order ID=%s", id)
 
 	var order domain.Order
-	// // Преобразуем строковый ID в ObjectID
-	// objectID, err := primitive.ObjectIDFromHex(id)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("invalid ObjectID format for order ID '%s': %w", id, err)
-	// }
-
-	err := collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&order)
+	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&order)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
+			log.Printf("[GetOrderByID] Order ID=%s not found", id)
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to fetch order with ID '%s': %w", id, err)
+		err = fmt.Errorf("failed to fetch order with ID '%s': %w", id, err)
+		log.Printf("[GetOrderByID] Error: %v", err)
+		return nil, err
 	}
 
+	log.Printf("[GetOrderByID] Order ID=%s found", id)
 	return &order, nil
 }
 
 func (r *orderRepository) ListOrders() ([]domain.Order, error) {
-	collection := r.db.Collection("orders")
-	var orders []domain.Order
+	ctx := context.Background()
+	log.Println("[ListOrders] Fetching all orders")
 
-	cursor, err := collection.Find(context.Background(), bson.M{}, options.Find())
+	cursor, err := r.collection.Find(ctx, bson.M{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch orders: %w", err)
+		err = fmt.Errorf("failed to fetch orders: %w", err)
+		log.Printf("[ListOrders] Error: %v", err)
+		return nil, err
 	}
-	defer cursor.Close(context.Background())
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			log.Printf("[ListOrders] Cursor close error: %v", err)
+		}
+	}()
 
-	for cursor.Next(context.Background()) {
+	var orders []domain.Order
+	for cursor.Next(ctx) {
 		var order domain.Order
 		if err := cursor.Decode(&order); err != nil {
-			return nil, fmt.Errorf("failed to decode order: %w", err)
+			err = fmt.Errorf("failed to decode order: %w", err)
+			log.Printf("[ListOrders] Error: %v", err)
+			return nil, err
 		}
 		orders = append(orders, order)
 	}
 
 	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error: %w", err)
+		err = fmt.Errorf("cursor iteration error: %w", err)
+		log.Printf("[ListOrders] Error: %v", err)
+		return nil, err
 	}
 
+	log.Printf("[ListOrders] Fetched %d orders", len(orders))
 	return orders, nil
 }
 
 func (r *orderRepository) UpdateOrder(order *domain.Order) error {
-	collection := r.db.Collection("orders")
-	// Преобразуем строковый ID обратно в ObjectID
+	ctx := context.Background()
+	log.Printf("[UpdateOrder] Updating order ID=%s", order.ID)
+
 	objectID, err := primitive.ObjectIDFromHex(order.ID)
 	if err != nil {
-		return fmt.Errorf("invalid ObjectID format for order ID '%s': %w", order.ID, err)
+		err = fmt.Errorf("invalid ObjectID format for order ID '%s': %w", order.ID, err)
+		log.Printf("[UpdateOrder] Error: %v", err)
+		return err
 	}
 
-	_, err = collection.UpdateOne(
-		context.Background(),
-		bson.M{"_id": objectID},
-		bson.M{"$set": bson.M{
+	update := bson.M{
+		"$set": bson.M{
 			"user_id":     order.UserID,
 			"items":       order.Items,
 			"total_price": order.TotalPrice,
 			"status":      order.Status,
 			"created_at":  order.CreatedAt,
 			"updated_at":  order.UpdatedAt,
-		}},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update order with ID '%s': %w", order.ID, err)
+		},
 	}
 
+	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	if err != nil {
+		err = fmt.Errorf("failed to update order with ID '%s': %w", order.ID, err)
+		log.Printf("[UpdateOrder] Error: %v", err)
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		log.Printf("[UpdateOrder] No order found with ID=%s", order.ID)
+		return fmt.Errorf("no order found with ID %s", order.ID)
+	}
+
+	log.Printf("[UpdateOrder] Successfully updated order ID=%s", order.ID)
 	return nil
 }
 
 func (r *orderRepository) DeleteOrder(id string) error {
-	collection := r.db.Collection("orders")
-	// Преобразуем строковый ID в ObjectID
+	ctx := context.Background()
+	log.Printf("[DeleteOrder] Deleting order ID=%s", id)
+
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return fmt.Errorf("invalid ObjectID format for order ID '%s': %w", id, err)
+		err = fmt.Errorf("invalid ObjectID format for order ID '%s': %w", id, err)
+		log.Printf("[DeleteOrder] Error: %v", err)
+		return err
 	}
 
-	_, err = collection.DeleteOne(context.Background(), bson.M{"_id": objectID})
+	result, err := r.collection.DeleteOne(ctx, bson.M{"_id": objectID})
 	if err != nil {
-		return fmt.Errorf("failed to delete order with ID '%s': %w", id, err)
+		err = fmt.Errorf("failed to delete order with ID '%s': %w", id, err)
+		log.Printf("[DeleteOrder] Error: %v", err)
+		return err
 	}
 
+	if result.DeletedCount == 0 {
+		log.Printf("[DeleteOrder] No order found to delete with ID=%s", id)
+		return fmt.Errorf("no order found to delete with ID %s", id)
+	}
+
+	log.Printf("[DeleteOrder] Successfully deleted order ID=%s", id)
 	return nil
 }

@@ -19,6 +19,9 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
 	cfg := config.LoadConfig()
 	if cfg == nil {
 		log.Fatalf("failed to load configuration")
@@ -29,7 +32,11 @@ func main() {
 		log.Fatalf("failed to connect to the database")
 	}
 
-	ctx := context.Background()
+	err := repository.RunMigrations(ctx, db)
+	if err != nil {
+		log.Fatalf("Ошибка миграции БД: %v", err)
+	}
+
 	if err := config.InitRedis(ctx); err != nil {
 		log.Fatalf("Не удалось подключиться к Redis: %v", err)
 	}

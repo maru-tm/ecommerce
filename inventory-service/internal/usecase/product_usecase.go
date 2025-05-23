@@ -60,10 +60,7 @@ func (uc *productUseCase) CreateProduct(product *domain.Product) error {
 		return fmt.Errorf("product with name '%s' already exists", product.Name)
 	}
 
-	if product.ID == "" {
-		product.ID = uuid.New().String()
-		log.Printf("[CREATE] Generated new UUID for product: %s", product.ID)
-	}
+	product.ID = uuid.New().String()
 
 	if err := uc.repo.CreateProduct(product); err != nil {
 		log.Printf("[CREATE] Failed to create product: %v", err)
@@ -77,7 +74,11 @@ func (uc *productUseCase) CreateProduct(product *domain.Product) error {
 func (uc *productUseCase) GetProductByID(id string) (*domain.Product, error) {
 	ctx := context.Background()
 
-	if p, _ := uc.cache.GetProduct(ctx, id); p != nil {
+	p, err := uc.cache.GetProduct(ctx, id)
+	if err != nil {
+		log.Printf("[CACHE] Error getting product from cache: %v", err)
+	}
+	if p != nil {
 		log.Printf("[GET] Product found in cache: %s", id)
 		return p, nil
 	}
@@ -110,14 +111,14 @@ func (uc *productUseCase) ListProducts() ([]domain.Product, error) {
 
 	products, err := uc.cache.GetProducts(ctx, cacheKey)
 	if err != nil {
-		log.Printf("[LIST] Error retrieving products from cache: %v", err)
+		log.Printf("[CACHE] Error retrieving products from cache: %v", err)
 	}
 	if products != nil {
 		log.Println("[LIST] Products loaded from cache")
 		return products, nil
 	}
 
-	log.Println("[LIST] Cache is empty. Fetching from repository...")
+	log.Println("[LIST] Cache is empty or error. Fetching from repository...")
 	products, err = uc.repo.ListProducts()
 	if err != nil {
 		log.Printf("[LIST] Error fetching products from repository: %v", err)
@@ -125,9 +126,9 @@ func (uc *productUseCase) ListProducts() ([]domain.Product, error) {
 	}
 
 	if err := uc.cache.SetProducts(ctx, cacheKey, products); err != nil {
-		log.Printf("[LIST] Failed to cache products: %v", err)
+		log.Printf("[CACHE] Failed to cache products: %v", err)
 	} else {
-		log.Printf("[LIST] Products cached successfully. Key: %s, Count: %d", cacheKey, len(products))
+		log.Printf("[CACHE] Products cached successfully. Key: %s, Count: %d", cacheKey, len(products))
 	}
 
 	return products, nil
@@ -159,6 +160,29 @@ func (uc *productUseCase) UpdateProduct(id string, product *domain.Product) erro
 	if err := uc.repo.UpdateProduct(product); err != nil {
 		log.Printf("[UPDATE] Failed to update product: %v", err)
 		return err
+	}
+
+	ctx := context.Background()
+
+	// Инвалидация кеша для конкретного продукта
+	if err := uc.cache.DeleteProduct(ctx, product.ID); err != nil {
+		log.Printf("[CACHE] Failed to invalidate cache for product %s: %v", product.ID, err)
+	} else {
+		log.Printf("[CACHE] Cache invalidated for product %s", product.ID)
+	}
+
+	// Обновить кеш новым значением
+	if err := uc.cache.SetProduct(ctx, product); err != nil {
+		log.Printf("[CACHE] Failed to update cache for product %s: %v", product.ID, err)
+	} else {
+		log.Printf("[CACHE] Cache updated for product %s", product.ID)
+	}
+
+	// Инвалидация кеша списка продуктов
+	if err := uc.cache.DeleteProduct(ctx, "all_products"); err != nil {
+		log.Printf("[CACHE] Failed to invalidate products list cache: %v", err)
+	} else {
+		log.Printf("[CACHE] Products list cache invalidated")
 	}
 
 	log.Printf("[UPDATE] Product updated successfully: %+v", product)
@@ -193,6 +217,19 @@ func (uc *productUseCase) DecreaseStock(productID string, quantity int) error {
 		return fmt.Errorf("failed to update product stock: %w", err)
 	}
 
+	// Инвалидация кэша
+	ctx := context.Background()
+	if err := uc.cache.DeleteProduct(ctx, productID); err != nil {
+		log.Printf("[CACHE] Failed to invalidate cache for product %s: %v", productID, err)
+	} else {
+		log.Printf("[CACHE] Cache invalidated for product %s", productID)
+	}
+	if err := uc.cache.DeleteProduct(ctx, "all_products"); err != nil {
+		log.Printf("[CACHE] Failed to invalidate products list cache: %v", err)
+	} else {
+		log.Printf("[CACHE] Products list cache invalidated")
+	}
+
 	log.Printf("[STOCK] Stock updated successfully. New stock: %d", product.Stock)
 	return nil
 }
@@ -213,6 +250,19 @@ func (uc *productUseCase) DeleteProduct(id string) error {
 	if err := uc.repo.DeleteProduct(id); err != nil {
 		log.Printf("[DELETE] Failed to delete product: %v", err)
 		return err
+	}
+
+	ctx := context.Background()
+	if err := uc.cache.DeleteProduct(ctx, id); err != nil {
+		log.Printf("[CACHE] Failed to invalidate cache for deleted product %s: %v", id, err)
+	} else {
+		log.Printf("[CACHE] Cache invalidated for deleted product %s", id)
+	}
+
+	if err := uc.cache.DeleteProduct(ctx, "all_products"); err != nil {
+		log.Printf("[CACHE] Failed to invalidate products list cache: %v", err)
+	} else {
+		log.Printf("[CACHE] Products list cache invalidated")
 	}
 
 	log.Printf("[DELETE] Product deleted successfully: %s", id)
@@ -261,6 +311,18 @@ func (uc *productUseCase) UpdateProductStock(productID string, quantity int) err
 	if err := uc.repo.UpdateProduct(product); err != nil {
 		log.Printf("[STOCK] Failed to update product stock: %v", err)
 		return fmt.Errorf("failed to update product stock: %w", err)
+	}
+
+	ctx := context.Background()
+	if err := uc.cache.DeleteProduct(ctx, productID); err != nil {
+		log.Printf("[CACHE] Failed to invalidate cache for product %s: %v", productID, err)
+	} else {
+		log.Printf("[CACHE] Cache invalidated for product %s", productID)
+	}
+	if err := uc.cache.DeleteProduct(ctx, "all_products"); err != nil {
+		log.Printf("[CACHE] Failed to invalidate products list cache: %v", err)
+	} else {
+		log.Printf("[CACHE] Products list cache invalidated")
 	}
 
 	log.Printf("[STOCK] Product stock updated successfully to %d", quantity)

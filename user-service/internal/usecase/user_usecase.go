@@ -17,11 +17,12 @@ type userUseCase struct {
 }
 
 func NewUserUseCase(repo domain.UserRepository, cache domain.UserCache) domain.UserUseCase {
+	log.Printf("[INFO] NewUserUseCase: initialized")
 	return &userUseCase{repo: repo, cache: cache}
 }
 
 func (uc *userUseCase) validateUser(user *domain.User) error {
-	log.Printf("Validating user: %+v", user)
+	log.Printf("[DEBUG] validateUser: validating user: %+v", user)
 
 	if user.Username == "" {
 		return fmt.Errorf("username cannot be empty")
@@ -39,23 +40,24 @@ func (uc *userUseCase) validateUser(user *domain.User) error {
 }
 
 func (uc *userUseCase) CreateUser(user *domain.User) (*domain.User, error) {
-	log.Println("Creating user...")
+	log.Printf("[INFO] CreateUser: start creating user username=%s", user.Username)
 
 	if err := uc.validateUser(user); err != nil {
-		log.Printf("Validation failed: %v", err)
+		log.Printf("[ERROR] CreateUser: validation failed: %v", err)
 		return nil, err
 	}
 
 	existingUser, err := uc.repo.GetUserByUsername(user.Username)
 	if err != nil {
-		log.Printf("Error checking username uniqueness: %v", err)
+		log.Printf("[ERROR] CreateUser: error checking username uniqueness: %v", err)
 		return nil, err
 	}
 	if existingUser != nil {
-		return nil, fmt.Errorf("user with username '%s' already exists", user.Username)
+		err := fmt.Errorf("user with username '%s' already exists", user.Username)
+		log.Printf("[ERROR] CreateUser: %v", err)
+		return nil, err
 	}
 
-	// Generate ID and timestamps
 	user.ID = uuid.New().String()
 	now := time.Now()
 	user.CreatedAt = &now
@@ -64,76 +66,85 @@ func (uc *userUseCase) CreateUser(user *domain.User) (*domain.User, error) {
 
 	createdUser, err := uc.repo.CreateUser(user)
 	if err != nil {
-		log.Printf("Failed to create user: %v", err)
+		log.Printf("[ERROR] CreateUser: failed to create user: %v", err)
 		return nil, err
 	}
-	log.Printf("User created: %+v", createdUser)
+
+	log.Printf("[INFO] CreateUser: user created successfully ID=%s username=%s", createdUser.ID, createdUser.Username)
 	return createdUser, nil
 }
 
 func (uc *userUseCase) GetUserByID(id string) (*domain.User, error) {
+	log.Printf("[INFO] GetUserByID: fetching user ID=%s", id)
 	ctx := context.Background()
 
-	// Сначала пробуем кэш
-	if user, _ := uc.cache.GetUser(ctx, id); user != nil {
-		log.Printf("[GET] User found in cache: %s", id)
+	user, _ := uc.cache.GetUser(ctx, id)
+	if user != nil {
+		log.Printf("[DEBUG] GetUserByID: user found in cache ID=%s", id)
 		return user, nil
 	}
 
-	// Иначе — база
-	log.Printf("[GET] User not found in cache. Fetching from DB: %s", id)
+	log.Printf("[DEBUG] GetUserByID: user not found in cache, querying DB ID=%s", id)
 	user, err := uc.repo.GetUserByID(id)
 	if err != nil {
-		log.Printf("Error fetching user: %v", err)
+		log.Printf("[ERROR] GetUserByID: error fetching user from DB ID=%s: %v", id, err)
 		return nil, err
 	}
+
 	if user == nil {
-		log.Printf("User with ID '%s' not found", id)
-		return nil, fmt.Errorf("user not found")
+		log.Printf("[INFO] GetUserByID: user not found ID=%s", id)
+		return nil, nil
 	}
+
 	if err := uc.cache.SetUser(ctx, user); err != nil {
-		log.Printf("[CACHE] Failed to set user in cache: %v", err)
+		log.Printf("[ERROR] GetUserByID: failed to cache user ID=%s: %v", id, err)
 	}
+
 	return user, nil
 }
 
 func (uc *userUseCase) ListUsers() ([]domain.User, error) {
-	log.Println("Listing users...")
-
+	log.Printf("[INFO] ListUsers: listing all users")
 	ctx := context.Background()
 	cacheKey := "users:all"
 
-	if users, _ := uc.cache.GetUsers(ctx, cacheKey); users != nil {
-		log.Println("[GET] Users found in cache")
+	users, _ := uc.cache.GetUsers(ctx, cacheKey)
+	if users != nil {
+		log.Printf("[DEBUG] ListUsers: users found in cache count=%d", len(users))
 		return users, nil
 	}
 
-	log.Println("[GET] Users not found in cache. Fetching from DB")
+	log.Printf("[DEBUG] ListUsers: users not found in cache, querying DB")
 	users, err := uc.repo.ListUsers()
 	if err != nil {
-		log.Printf("Error listing users: %v", err)
+		log.Printf("[ERROR] ListUsers: error listing users: %v", err)
 		return nil, err
 	}
+
 	if err := uc.cache.SetUsers(ctx, cacheKey, users); err != nil {
-		log.Printf("[CACHE] Failed to set users in cache: %v", err)
+		log.Printf("[ERROR] ListUsers: failed to cache users: %v", err)
 	}
+
+	log.Printf("[INFO] ListUsers: successfully retrieved users count=%d", len(users))
 	return users, nil
 }
 
 func (uc *userUseCase) UpdateUser(id string, user *domain.User) (*domain.User, error) {
-	log.Printf("Updating user ID: %s", id)
+	log.Printf("[INFO] UpdateUser: updating user ID=%s", id)
 
 	existingUser, err := uc.repo.GetUserByID(id)
 	if err != nil {
-		log.Printf("Error checking user existence: %v", err)
+		log.Printf("[ERROR] UpdateUser: error checking user existence ID=%s: %v", id, err)
 		return nil, err
 	}
 	if existingUser == nil {
-		return nil, fmt.Errorf("user with ID '%s' not found", id)
+		err := fmt.Errorf("user with ID '%s' not found", id)
+		log.Printf("[ERROR] UpdateUser: %v", err)
+		return nil, err
 	}
 
 	if err := uc.validateUser(user); err != nil {
-		log.Printf("Validation failed: %v", err)
+		log.Printf("[ERROR] UpdateUser: validation failed: %v", err)
 		return nil, err
 	}
 
@@ -146,29 +157,33 @@ func (uc *userUseCase) UpdateUser(id string, user *domain.User) (*domain.User, e
 
 	updatedUser, err := uc.repo.UpdateUser(user)
 	if err != nil {
-		log.Printf("Failed to update user: %v", err)
+		log.Printf("[ERROR] UpdateUser: failed to update user ID=%s: %v", id, err)
 		return nil, err
 	}
-	log.Printf("User updated: %+v", updatedUser)
+
+	log.Printf("[INFO] UpdateUser: user updated successfully ID=%s", updatedUser.ID)
 	return updatedUser, nil
 }
 
 func (uc *userUseCase) DeleteUser(id string) error {
-	log.Printf("Deleting user ID: %s", id)
+	log.Printf("[INFO] DeleteUser: deleting user ID=%s", id)
 
 	existingUser, err := uc.repo.GetUserByID(id)
 	if err != nil {
-		log.Printf("Error checking user existence: %v", err)
+		log.Printf("[ERROR] DeleteUser: error checking user existence ID=%s: %v", id, err)
 		return err
 	}
 	if existingUser == nil {
-		return fmt.Errorf("user with ID '%s' not found", id)
+		err := fmt.Errorf("user with ID '%s' not found", id)
+		log.Printf("[ERROR] DeleteUser: %v", err)
+		return err
 	}
 
 	if err := uc.repo.DeleteUser(id); err != nil {
-		log.Printf("Failed to delete user: %v", err)
+		log.Printf("[ERROR] DeleteUser: failed to delete user ID=%s: %v", id, err)
 		return err
 	}
-	log.Printf("User with ID '%s' deleted", id)
+
+	log.Printf("[INFO] DeleteUser: user deleted successfully ID=%s", id)
 	return nil
 }

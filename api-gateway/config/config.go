@@ -13,6 +13,12 @@ type Config struct {
 	ProductServiceAddr string
 	APIGatewayPort     string
 	RabbitMQURL        string
+
+	// Email settings
+	EmailFrom     string
+	EmailPassword string
+	SMTPHost      string
+	SMTPPort      string
 }
 
 func LoadConfig() *Config {
@@ -27,6 +33,12 @@ func LoadConfig() *Config {
 		ProductServiceAddr: getEnv("PRODUCT_SERVICE_ADDR", "inventory-service:50053"),
 		APIGatewayPort:     getEnv("API_GATEWAY_PORT", "8000"),
 		RabbitMQURL:        getEnv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/"),
+
+		// Email config
+		EmailFrom:     getEnv("EMAIL_FROM", ""),
+		EmailPassword: getEnv("EMAIL_PASSWORD", ""),
+		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:      getEnv("SMTP_PORT", "587"),
 	}
 }
 

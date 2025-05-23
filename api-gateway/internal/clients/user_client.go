@@ -2,7 +2,6 @@ package clients
 
 import (
 	"context"
-	"fmt"
 
 	proto "api-gateway/internal/proto/users/proto" // Путь к сгенерированным протобуфам
 
@@ -14,13 +13,13 @@ type UserClient struct {
 }
 
 // NewUserClient создает новый gRPC-клиент для сервиса пользователей
-func NewUserClient(address string) (*UserClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+func NewUserClient(addr string) (proto.UserServiceClient, error) {
+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to user service: %w", err)
+		return nil, err
 	}
 	client := proto.NewUserServiceClient(conn)
-	return &UserClient{client: client}, nil
+	return client, nil
 }
 
 // CreateUser создает нового пользователя

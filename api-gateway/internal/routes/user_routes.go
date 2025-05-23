@@ -1,14 +1,15 @@
 package routes
 
 import (
-	"api-gateway/internal/clients"
+	"api-gateway/internal/email"
 	"api-gateway/internal/handlers"
+	"api-gateway/internal/proto/users/proto"
 
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterUserRoutes(router *gin.Engine, userClient *clients.UserClient) {
-	userHandler := handlers.NewUserHandler(userClient)
+func RegisterUserRoutes(router *gin.Engine, userClient proto.UserServiceClient, mailer *email.Mailer) {
+	userHandler := handlers.NewUserHandler(userClient, mailer)
 
 	userGroup := router.Group("/api/users")
 	{

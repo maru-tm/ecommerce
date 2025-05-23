@@ -2,22 +2,22 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
+	"time"
 
 	"order-service/internal/domain"
-	"order-service/internal/infrastructure/messaging"
 
 	"github.com/google/uuid"
 )
 
 type orderUseCase struct {
 	orderRepo      domain.OrderRepository
-	orderPublisher *messaging.OrderPublisher
+	orderPublisher domain.OrderEventPublisher
 	orderCache     domain.OrderCache
 }
 
-func NewOrderUseCase(orderRepo domain.OrderRepository, orderPublisher *messaging.OrderPublisher, orderCache domain.OrderCache) domain.OrderUseCase {
+func NewOrderUseCase(orderRepo domain.OrderRepository, orderPublisher domain.OrderEventPublisher, orderCache domain.OrderCache) domain.OrderUseCase {
 	return &orderUseCase{
 		orderRepo:      orderRepo,
 		orderPublisher: orderPublisher,
@@ -25,8 +25,20 @@ func NewOrderUseCase(orderRepo domain.OrderRepository, orderPublisher *messaging
 	}
 }
 
+func (uc *orderUseCase) log(level, msg string, fields map[string]interface{}) {
+	logEntry := map[string]interface{}{
+		"level": level,
+		"msg":   msg,
+		"time":  time.Now().Format(time.RFC3339),
+	}
+	for k, v := range fields {
+		logEntry[k] = v
+	}
+	b, _ := json.Marshal(logEntry)
+	fmt.Println(string(b))
+}
+
 func (uc *orderUseCase) validateOrder(order *domain.Order) error {
-	// Проверяем обязательные поля в заказе
 	if order.UserID == "" {
 		return fmt.Errorf("user id cannot be empty")
 	}
@@ -41,54 +53,52 @@ func (uc *orderUseCase) validateOrder(order *domain.Order) error {
 			return fmt.Errorf("order item quantity must be positive")
 		}
 	}
-
 	return nil
 }
 
 func (uc *orderUseCase) CreateOrder(order *domain.Order) error {
-	// Валидация заказа
 	if err := uc.validateOrder(order); err != nil {
+		uc.log("ERROR", "Order validation failed", map[string]interface{}{"error": err.Error()})
 		return err
 	}
 
-	// Генерируем ID для заказа, если его нет
-	if order.ID == "" {
-		order.ID = uuid.New().String()
-	}
+	order.ID = uuid.New().String()
+	now := time.Now()
+	order.CreatedAt = &now
+	order.UpdatedAt = &now
 
-	// Сохраняем заказ в репозитории
 	if err := uc.orderRepo.CreateOrder(order); err != nil {
-		return fmt.Errorf("failed to create order: %v", err)
+		uc.log("ERROR", "Failed to create order in repository", map[string]interface{}{"error": err.Error(), "order_id": order.ID})
+		return fmt.Errorf("failed to create order: %w", err)
 	}
 
-	// Публикуем сообщение о создании заказа в RabbitMQ
 	if err := uc.orderPublisher.Publish(order); err != nil {
-		return fmt.Errorf("failed to publish order creation event: %v", err)
+		uc.log("ERROR", "Failed to publish order creation event", map[string]interface{}{"error": err.Error(), "order_id": order.ID})
+		return fmt.Errorf("failed to publish order creation event: %w", err)
 	}
 
+	uc.log("INFO", "Order created successfully", map[string]interface{}{"order_id": order.ID, "user_id": order.UserID})
 	return nil
 }
 
 func (uc *orderUseCase) GetOrderByID(id string) (*domain.Order, error) {
 	ctx := context.Background()
 
-	// Попытка получить из кэша
-	if order, _ := uc.orderCache.GetOrder(ctx, id); order != nil {
-		log.Printf("[GET] Order found in cache: %s", id)
+	order, err := uc.orderCache.GetOrder(ctx, id)
+	if err == nil && order != nil {
+		uc.log("INFO", "Order found in cache", map[string]interface{}{"order_id": id})
 		return order, nil
 	}
 
-	// Из базы
-	log.Printf("[GET] Order not found in cache. Fetching from DB: %s", id)
-	order, err := uc.orderRepo.GetOrderByID(id)
+	uc.log("INFO", "Order not found in cache. Fetching from DB", map[string]interface{}{"order_id": id})
+	order, err = uc.orderRepo.GetOrderByID(id)
 	if err != nil {
-		log.Printf("[GET] Error fetching order from DB: %v", err)
+		uc.log("ERROR", "Failed to fetch order from DB", map[string]interface{}{"error": err.Error(), "order_id": id})
 		return nil, err
 	}
 
-	// Кэшируем
 	if err := uc.orderCache.SetOrder(ctx, order); err != nil {
-		log.Printf("[CACHE] Failed to set order in cache: %v", err)
+		uc.log("WARN", "Failed to set order in cache", map[string]interface{}{"error": err.Error(), "order_id": id})
 	}
 
 	return order, nil
@@ -98,23 +108,21 @@ func (uc *orderUseCase) ListOrders() ([]domain.Order, error) {
 	ctx := context.Background()
 	cacheKey := "orders:all"
 
-	// Попытка получить из кэша
-	if orders, _ := uc.orderCache.GetOrders(ctx, cacheKey); orders != nil {
-		log.Println("[GET] Orders found in cache")
+	orders, err := uc.orderCache.GetOrders(ctx, cacheKey)
+	if err == nil && orders != nil {
+		uc.log("INFO", "Orders found in cache", map[string]interface{}{"cache_key": cacheKey})
 		return orders, nil
 	}
 
-	// Из базы
-	log.Println("[GET] Orders not found in cache. Fetching from DB")
-	orders, err := uc.orderRepo.ListOrders()
+	uc.log("INFO", "Orders not found in cache. Fetching from DB", nil)
+	orders, err = uc.orderRepo.ListOrders()
 	if err != nil {
-		log.Printf("[GET] Error fetching orders from DB: %v", err)
+		uc.log("ERROR", "Failed to fetch orders from DB", map[string]interface{}{"error": err.Error()})
 		return nil, err
 	}
 
-	// Кэшируем
 	if err := uc.orderCache.SetOrders(ctx, cacheKey, orders); err != nil {
-		log.Printf("[CACHE] Failed to set orders in cache: %v", err)
+		uc.log("WARN", "Failed to set orders in cache", map[string]interface{}{"error": err.Error(), "cache_key": cacheKey})
 	}
 
 	return orders, nil
@@ -122,12 +130,37 @@ func (uc *orderUseCase) ListOrders() ([]domain.Order, error) {
 
 func (uc *orderUseCase) UpdateOrder(order *domain.Order) error {
 	if err := uc.validateOrder(order); err != nil {
+		uc.log("ERROR", "Order validation failed during update", map[string]interface{}{"error": err.Error(), "order_id": order.ID})
 		return err
 	}
 
-	return uc.orderRepo.UpdateOrder(order)
+	if err := uc.orderRepo.UpdateOrder(order); err != nil {
+		uc.log("ERROR", "Failed to update order", map[string]interface{}{"error": err.Error(), "order_id": order.ID})
+		return err
+	}
+
+	// Очистка кэша после успешного обновления
+	ctx := context.Background()
+	if err := uc.orderCache.DeleteOrder(ctx, order.ID); err != nil {
+		uc.log("WARN", "Failed to delete order from cache after update", map[string]interface{}{"error": err.Error(), "order_id": order.ID})
+	}
+
+	uc.log("INFO", "Order updated successfully", map[string]interface{}{"order_id": order.ID})
+	return nil
 }
 
 func (uc *orderUseCase) DeleteOrder(id string) error {
-	return uc.orderRepo.DeleteOrder(id)
+	if err := uc.orderRepo.DeleteOrder(id); err != nil {
+		uc.log("ERROR", "Failed to delete order", map[string]interface{}{"error": err.Error(), "order_id": id})
+		return err
+	}
+
+	// Очистка кэша после успешного удаления
+	ctx := context.Background()
+	if err := uc.orderCache.DeleteOrder(ctx, id); err != nil {
+		uc.log("WARN", "Failed to delete order from cache after delete", map[string]interface{}{"error": err.Error(), "order_id": id})
+	}
+
+	uc.log("INFO", "Order deleted successfully", map[string]interface{}{"order_id": id})
+	return nil
 }

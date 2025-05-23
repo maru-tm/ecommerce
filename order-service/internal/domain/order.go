@@ -23,8 +23,8 @@ type Order struct {
 	Items      []OrderItem `bson:"items" json:"items"`
 	TotalPrice float64     `bson:"total_price" json:"total_price"`
 	Status     OrderStatus `bson:"status" json:"status"`
-	CreatedAt  time.Time   `bson:"created_at" json:"created_at"`
-	UpdatedAt  time.Time   `bson:"updated_at" json:"updated_at"`
+	CreatedAt  *time.Time  `bson:"created_at" json:"created_at"`
+	UpdatedAt  *time.Time  `bson:"updated_at" json:"updated_at"`
 }
 
 type OrderUseCase interface {
