@@ -161,6 +161,11 @@ func (uc *userUseCase) UpdateUser(id string, user *domain.User) (*domain.User, e
 		return nil, err
 	}
 
+	// Обновляем кеш
+	if err := uc.cache.SetUser(context.Background(), updatedUser); err != nil {
+		log.Printf("[WARN] UpdateUser: failed to update user in cache ID=%s: %v", id, err)
+	}
+
 	log.Printf("[INFO] UpdateUser: user updated successfully ID=%s", updatedUser.ID)
 	return updatedUser, nil
 }
@@ -182,6 +187,11 @@ func (uc *userUseCase) DeleteUser(id string) error {
 	if err := uc.repo.DeleteUser(id); err != nil {
 		log.Printf("[ERROR] DeleteUser: failed to delete user ID=%s: %v", id, err)
 		return err
+	}
+
+	// Удаляем пользователя из кеша
+	if err := uc.cache.DeleteUser(context.Background(), id); err != nil {
+		log.Printf("[WARN] DeleteUser: failed to delete user from cache ID=%s: %v", id, err)
 	}
 
 	log.Printf("[INFO] DeleteUser: user deleted successfully ID=%s", id)

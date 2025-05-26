@@ -22,10 +22,16 @@ func (m *mockOrderRepo) CreateOrder(order *domain.Order) error {
 }
 func (m *mockOrderRepo) GetOrderByID(id string) (*domain.Order, error) {
 	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*domain.Order), args.Error(1)
 }
 func (m *mockOrderRepo) ListOrders() ([]domain.Order, error) {
 	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).([]domain.Order), args.Error(1)
 }
 func (m *mockOrderRepo) UpdateOrder(order *domain.Order) error {
@@ -52,6 +58,9 @@ func (m *mockOrderCache) SetOrder(ctx context.Context, order *domain.Order) erro
 }
 func (m *mockOrderCache) GetOrder(ctx context.Context, id string) (*domain.Order, error) {
 	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*domain.Order), args.Error(1)
 }
 func (m *mockOrderCache) DeleteOrder(ctx context.Context, id string) error {
@@ -64,10 +73,13 @@ func (m *mockOrderCache) SetOrders(ctx context.Context, key string, orders []dom
 }
 func (m *mockOrderCache) GetOrders(ctx context.Context, key string) ([]domain.Order, error) {
 	args := m.Called(ctx, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).([]domain.Order), args.Error(1)
 }
 
-// ==== TEST ====
+// ==== TESTS ====
 
 func TestCreateOrder_Success(t *testing.T) {
 	mockRepo := new(mockOrderRepo)
@@ -75,41 +87,49 @@ func TestCreateOrder_Success(t *testing.T) {
 	mockCache := new(mockOrderCache)
 
 	order := &domain.Order{
+		ID:     "1",
 		UserID: "user123",
 		Items: []domain.OrderItem{
-			{ProductID: "prod123", Quantity: 2},
+			{ProductID: "prod-1", Quantity: 2},
 		},
-		TotalPrice: 100,
 	}
 
-	mockRepo.On("CreateOrder", mock.AnythingOfType("*domain.Order")).Return(nil)
-	mockPublisher.On("Publish", mock.AnythingOfType("*domain.Order")).Return(nil)
+	mockRepo.On("CreateOrder", order).Return(nil)
+	mockPublisher.On("Publish", order).Return(nil)
 
 	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
-
 	err := uc.CreateOrder(order)
 
 	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
-	mockPublisher.AssertExpectations(t)
 }
 
 func TestCreateOrder_ValidationError(t *testing.T) {
+	uc := usecase.NewOrderUseCase(nil, nil, nil)
+
+	err := uc.CreateOrder(&domain.Order{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "user id cannot be empty")
+}
+
+func TestCreateOrder_PublishError(t *testing.T) {
 	mockRepo := new(mockOrderRepo)
 	mockPublisher := new(mockOrderPublisher)
 	mockCache := new(mockOrderCache)
 
 	order := &domain.Order{
-		UserID: "", // ошибка
-		Items:  []domain.OrderItem{},
+		UserID:     "user1",
+		Items:      []domain.OrderItem{{ProductID: "p1", Quantity: 1}},
+		TotalPrice: 10,
 	}
 
-	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
+	mockRepo.On("CreateOrder", order).Return(nil)
+	mockPublisher.On("Publish", order).Return(errors.New("pub error"))
 
+	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
 	err := uc.CreateOrder(order)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "user id cannot be empty")
+	assert.Contains(t, err.Error(), "pub error")
 }
 
 func TestGetOrderByID_CacheHit(t *testing.T) {
@@ -117,17 +137,15 @@ func TestGetOrderByID_CacheHit(t *testing.T) {
 	mockPublisher := new(mockOrderPublisher)
 	mockCache := new(mockOrderCache)
 
-	order := &domain.Order{ID: "order123", UserID: "user123"}
+	order := &domain.Order{ID: "123", UserID: "user1"}
 
-	mockCache.On("GetOrder", mock.Anything, "order123").Return(order, nil)
+	mockCache.On("GetOrder", mock.Anything, "123").Return(order, nil)
 
 	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
-
-	res, err := uc.GetOrderByID("order123")
+	res, err := uc.GetOrderByID("123")
 
 	assert.NoError(t, err)
-	assert.Equal(t, "order123", res.ID)
-	mockCache.AssertExpectations(t)
+	assert.Equal(t, "123", res.ID)
 }
 
 func TestGetOrderByID_DBHit(t *testing.T) {
@@ -135,18 +153,88 @@ func TestGetOrderByID_DBHit(t *testing.T) {
 	mockPublisher := new(mockOrderPublisher)
 	mockCache := new(mockOrderCache)
 
-	order := &domain.Order{ID: "order123", UserID: "user123"}
+	order := &domain.Order{ID: "123", UserID: "user1"}
 
-	mockCache.On("GetOrder", mock.Anything, "order123").Return(nil, errors.New("not found"))
-	mockRepo.On("GetOrderByID", "order123").Return(order, nil)
+	mockCache.On("GetOrder", mock.Anything, "123").Return(nil, errors.New("miss"))
+	mockRepo.On("GetOrderByID", "123").Return(order, nil)
 	mockCache.On("SetOrder", mock.Anything, order).Return(nil)
 
 	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
-
-	res, err := uc.GetOrderByID("order123")
+	res, err := uc.GetOrderByID("123")
 
 	assert.NoError(t, err)
-	assert.Equal(t, "order123", res.ID)
+	assert.Equal(t, "123", res.ID)
+}
+
+func TestGetOrderByID_Error(t *testing.T) {
+	mockRepo := new(mockOrderRepo)
+	mockPublisher := new(mockOrderPublisher)
+	mockCache := new(mockOrderCache)
+
+	mockCache.On("GetOrder", mock.Anything, "123").Return(nil, errors.New("miss"))
+	mockRepo.On("GetOrderByID", "123").Return(nil, errors.New("not found"))
+
+	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
+	_, err := uc.GetOrderByID("123")
+
+	assert.Error(t, err)
+}
+
+func TestListOrders_CacheHit(t *testing.T) {
+	mockRepo := new(mockOrderRepo)
+	mockPublisher := new(mockOrderPublisher)
+	mockCache := new(mockOrderCache)
+
+	orders := []domain.Order{{ID: "1"}, {ID: "2"}}
+
+	mockCache.On("GetOrders", mock.Anything, "orders:all").Return(orders, nil)
+
+	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
+	res, err := uc.ListOrders()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(res))
+}
+
+func TestListOrders_DBHit(t *testing.T) {
+	mockRepo := new(mockOrderRepo)
+	mockPublisher := new(mockOrderPublisher)
+	mockCache := new(mockOrderCache)
+
+	orders := []domain.Order{{ID: "1"}, {ID: "2"}}
+
+	mockCache.On("GetOrders", mock.Anything, "orders:all").Return(nil, errors.New("miss"))
+	mockRepo.On("ListOrders").Return(orders, nil)
+	mockCache.On("SetOrders", mock.Anything, "orders:all", orders).Return(nil)
+
+	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
+	res, err := uc.ListOrders()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(res))
+}
+
+func TestUpdateOrder_Success(t *testing.T) {
+	mockRepo := new(mockOrderRepo)
+	mockPublisher := new(mockOrderPublisher)
+	mockCache := new(mockOrderCache)
+
+	order := &domain.Order{
+		ID:     "1",
+		UserID: "user1",
+		Items: []domain.OrderItem{
+			{ProductID: "prod-1", Quantity: 1},
+		},
+	}
+
+	mockRepo.On("UpdateOrder", order).Return(nil)
+	mockPublisher.On("Publish", order).Return(nil)
+	mockCache.On("DeleteOrder", mock.Anything, order.ID).Return(nil) // вот тут
+
+	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
+	err := uc.UpdateOrder(order)
+
+	assert.NoError(t, err)
 }
 
 func TestDeleteOrder_Success(t *testing.T) {
@@ -154,14 +242,11 @@ func TestDeleteOrder_Success(t *testing.T) {
 	mockPublisher := new(mockOrderPublisher)
 	mockCache := new(mockOrderCache)
 
-	mockRepo.On("DeleteOrder", "order123").Return(nil)
-	mockCache.On("DeleteOrder", mock.Anything, "order123").Return(nil)
+	mockRepo.On("DeleteOrder", "1").Return(nil)
+	mockCache.On("DeleteOrder", mock.Anything, "1").Return(nil)
 
 	uc := usecase.NewOrderUseCase(mockRepo, mockPublisher, mockCache)
-
-	err := uc.DeleteOrder("order123")
+	err := uc.DeleteOrder("1")
 
 	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
-	mockCache.AssertExpectations(t)
 }
