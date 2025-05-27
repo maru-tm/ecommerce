@@ -8,6 +8,7 @@ type Category struct {
 
 type Product struct {
 	ID          string   `bson:"_id,omitempty" json:"id"`
+	SKU         string   `bson:"sku" json:"sku"`
 	Name        string   `bson:"name" json:"name"`
 	Category    Category `bson:"category" json:"category"`
 	Price       float64  `bson:"price" json:"price"`

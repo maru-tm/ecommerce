@@ -22,6 +22,7 @@ services:
     build: ./user-service
     ports:
       - "50051:50051"
+      - "9101:9101"
     env_file:
       - ./user-service/.env
     depends_on:
@@ -38,6 +39,7 @@ services:
     build: ./inventory-service
     ports:
       - "50053:50053"
+      - "9103:9103"
     env_file:
       - ./inventory-service/.env
     depends_on:
@@ -56,6 +58,8 @@ services:
     build: ./order-service
     ports:
       - "50052:50052"
+      - "9102:9102"
+
     env_file:
       - ./order-service/.env
     depends_on:
@@ -69,6 +73,8 @@ services:
       retries: 5
       start_period: 10s
       timeout: 10s
+
+
 
   mongo:
     image: mongo:6.0
@@ -109,6 +115,32 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+  
+  
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api-gateway
+      - user-service
+      - order-service
+      - inventory-service
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
 
 volumes:
   mongo-data:

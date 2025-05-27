@@ -18,16 +18,59 @@ func NewOrderHandler(client *clients.OrderClient) *OrderHandler {
 	return &OrderHandler{client: client}
 }
 
+type OrderItemInput struct {
+	ProductID string `json:"product_id"`
+	Quantity  int32  `json:"quantity"`
+}
+
+type CreateOrderRequest struct {
+	UserID     string           `json:"user_id"`
+	Items      []OrderItemInput `json:"items"`
+	TotalPrice float64          `json:"total_price"`
+	Status     string           `json:"status"`
+}
+
 // CreateOrder обрабатывает создание нового заказа
+// func (h *OrderHandler) CreateOrder(c *gin.Context) {
+// 	var orderRequest proto.Order
+// 	if err := c.ShouldBindJSON(&orderRequest); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+// 		return
+// 	}
+
+// 	// Взаимодействие с OrderClient для создания заказа
+// 	orderResponse, err := h.client.CreateOrder(context.Background(), &orderRequest)
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order", "details": err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, orderResponse)
+// }
+
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
-	var orderRequest proto.Order
-	if err := c.ShouldBindJSON(&orderRequest); err != nil {
+	var req CreateOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	// Взаимодействие с OrderClient для создания заказа
-	orderResponse, err := h.client.CreateOrder(context.Background(), &orderRequest)
+	// Преобразование в proto.Order
+	order := &proto.Order{
+		UserId:     req.UserID,
+		TotalPrice: req.TotalPrice,
+		Items:      []*proto.OrderItem{},
+	}
+
+	for _, item := range req.Items {
+		order.Items = append(order.Items, &proto.OrderItem{
+			ProductId: item.ProductID,
+			Quantity:  item.Quantity,
+		})
+	}
+
+	// gRPC вызов
+	orderResponse, err := h.client.CreateOrder(context.Background(), order)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order", "details": err.Error()})
 		return

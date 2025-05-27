@@ -28,13 +28,13 @@ func NewMailer(cfg *config.Config) *Mailer {
 func (m *Mailer) SendWelcomeEmail(toEmail, fullName string) error {
 	auth := smtp.PlainAuth("", m.From, m.Password, m.Host)
 
-	subject := "Добро пожаловать в Bookstore!"
+	subject := "Добро пожаловать в Petstore!"
 	body := fmt.Sprintf(`
 Добро пожаловать, %s!
 
 Спасибо за регистрацию на нашей платформе.
 
-С любовью, команда Bookstore 💙
+С любовью, команда Petstore 💙
 `, fullName)
 
 	msg := []byte("Subject: " + subject + "\r\n" +

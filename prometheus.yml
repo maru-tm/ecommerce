@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:9101']
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:9102']
+
+  - job_name: 'inventory-service'
+    static_configs:
+      - targets: ['inventory-service:9103']

@@ -60,11 +60,32 @@ func (uc *productUseCase) CreateProduct(product *domain.Product) error {
 		return fmt.Errorf("product with name '%s' already exists", product.Name)
 	}
 
+	if product.SKU == "" {
+		product.SKU = uuid.New().String()
+	}
+
 	product.ID = uuid.New().String()
 
 	if err := uc.repo.CreateProduct(product); err != nil {
 		log.Printf("[CREATE] Failed to create product: %v", err)
 		return err
+	}
+
+	// Очистка кэша после создания продукта
+	ctx := context.Background()
+	cacheKey := "all_products"
+
+	if err := uc.cache.DeleteProduct(ctx, cacheKey); err != nil {
+		log.Printf("[CACHE] Failed to clear products list cache: %v", err)
+	} else {
+		log.Printf("[CACHE] Products list cache cleared")
+	}
+
+	// Также можно очистить кэш конкретного продукта по ID, если такой кэш есть
+	if err := uc.cache.DeleteProduct(ctx, product.ID); err != nil {
+		log.Printf("[CACHE] Failed to clear product cache: %v", err)
+	} else {
+		log.Printf("[CACHE] Product cache cleared for ID: %s", product.ID)
 	}
 
 	log.Printf("[CREATE] Product created successfully: %+v", product)

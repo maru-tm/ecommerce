@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"api-gateway/config"
@@ -33,8 +35,22 @@ func main() {
 
 	r := gin.Default()
 
+	// Включаем CORS — разрешаем запросы с фронтенда (localhost:3000)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	r.Use(middleware.LoggerMiddleware())
-	r.Use(middleware.AuthMiddleware())
+	// r.Use(middleware.AuthMiddleware()) // Пока отключено
+
+	r.GET("/test-cors", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "CORS работает"})
+	})
 
 	routes.RegisterUserRoutes(r, userClient, mailer)
 	routes.RegisterOrderRoutes(r, orderClient)

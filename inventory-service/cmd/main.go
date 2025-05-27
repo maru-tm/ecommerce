@@ -31,6 +31,7 @@ func main() {
 	if db == nil {
 		log.Fatalf("failed to connect to the database")
 	}
+	config.InitMetrics("9103", "inventory-service")
 
 	err := repository.RunMigrations(ctx, db)
 	if err != nil {

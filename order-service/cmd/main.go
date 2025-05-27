@@ -28,6 +28,7 @@ func main() {
 	if db == nil {
 		log.Fatalf("failed to connect to the database")
 	}
+	config.InitMetrics("9102", "order-service")
 
 	ctx := context.Background()
 	if err := config.InitRedis(ctx); err != nil {

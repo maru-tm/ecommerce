@@ -28,6 +28,8 @@ func main() {
 		log.Fatalf("failed to connect to the database")
 	}
 
+	config.InitMetrics("9101", "user-service")
+
 	ctx := context.Background()
 	if err := config.InitRedis(ctx); err != nil {
 		log.Fatalf("Не удалось подключиться к Redis: %v", err)

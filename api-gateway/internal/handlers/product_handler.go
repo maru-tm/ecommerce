@@ -51,15 +51,40 @@ func (h *ProductHandler) GetProductByID(c *gin.Context) {
 }
 
 // ListProducts обрабатывает получение списка всех продуктов
+// func (h *ProductHandler) ListProducts(c *gin.Context) {
+// 	// Взаимодействие с ProductClient для получения списка всех продуктов
+// 	productList, err := h.client.ListProducts(context.Background())
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve product list", "details": err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, productList)
+// }
+
 func (h *ProductHandler) ListProducts(c *gin.Context) {
-	// Взаимодействие с ProductClient для получения списка всех продуктов
 	productList, err := h.client.ListProducts(context.Background())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve product list", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to retrieve product list",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, productList)
+	// Преобразуем в формат, подходящий для JSON
+	products := make([]gin.H, 0, len(productList.Products))
+	for _, p := range productList.Products {
+		products = append(products, gin.H{
+			"id":          p.Id,
+			"name":        p.Name,
+			"description": p.Description,
+			"price":       p.Price,
+			"stock":       p.Stock,
+		})
+	}
+
+	c.JSON(http.StatusOK, products)
 }
 
 // UpdateProduct обрабатывает обновление данных продукта
